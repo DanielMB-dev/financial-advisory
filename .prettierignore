@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Cache
+.turbo/
+.cache/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Env files
+.env*
+!.env.example
+
+# Misc
+.DS_Store
+*.log
+*.tsbuildinfo
