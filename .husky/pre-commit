@@ -1,1 +1,13 @@
-npm test
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+# Run lint-staged (formatting + lint fixes)
+npx lint-staged
+
+# Optional: lightweight type check
+npm run type-check --silent || exit 1
+
+# Optional: run quick tests (skip heavy ones)
+npm run test -- --passWithNoTests --silent || exit 1

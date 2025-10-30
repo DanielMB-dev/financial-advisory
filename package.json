@@ -45,5 +45,11 @@
     "lint-staged": "^16.2.6",
     "prettier": "^3.6.2",
     "vitest": "^4.0.5"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,css,md}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   }
 }
