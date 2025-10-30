@@ -56,6 +56,7 @@ export async function middleware(request: NextRequest) {
   if (process.env.NODE_ENV === 'development') {
     console.log(`[${new Date().toISOString()}] ${request.method} ${pathname}`)
   }
+  console.log('trigger')
 
   return NextResponse.next()
 }
