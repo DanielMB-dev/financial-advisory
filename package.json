@@ -14,8 +14,7 @@
     "test:watch": "vitest --watch",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "validate": "npm run type-check && npm run lint && npm run test:ci",
-     "prepare": "command -v husky >/dev/null 2>&1 && husky install || true"
+    "validate": "npm run type-check && npm run lint && npm run test:ci"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.22.0",
