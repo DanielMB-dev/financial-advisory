@@ -1,4 +1,4 @@
 export interface ResetPasswordDTO {
-  token: string;
-  newPassword: string;
+  token: string
+  newPassword: string
 }

@@ -1,4 +1,4 @@
 export interface UpdateProfileDTO {
-  fullName?: string;
-  avatarUrl?: string;
+  fullName?: string
+  avatarUrl?: string
 }

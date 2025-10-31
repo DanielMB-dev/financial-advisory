@@ -2,7 +2,7 @@ echo "🔍 Running pre-commit checks..."
 
 # Run lint-staged (formatting + lint fixes)
 npx lint-staged
-
+npm run format 
 npm run lint
 
 # Optional: lightweight type check

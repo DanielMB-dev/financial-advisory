@@ -1,4 +1,4 @@
-import { Email } from '../value-objects/Email';
+import { Email } from '../value-objects/Email'
 
 export class PasswordResetRequested {
   constructor(

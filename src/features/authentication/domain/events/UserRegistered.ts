@@ -1,5 +1,5 @@
-import { UserId } from '../value-objects/UserId';
-import { Email } from '../value-objects/Email';
+import { UserId } from '../value-objects/UserId'
+import { Email } from '../value-objects/Email'
 
 export class UserRegistered {
   constructor(

@@ -1,6 +1,6 @@
-import { ISessionManager } from '../ports/ISessionManager';
-import { IUserRepository } from '../ports/IUserRepository';
-import { UserDTO } from '../dtos/UserDTO';
+import { ISessionManager } from '../ports/ISessionManager'
+import { IUserRepository } from '../ports/IUserRepository'
+import { UserDTO } from '../dtos/UserDTO'
 
 export class GetCurrentUserUseCase {
   constructor(
@@ -10,17 +10,17 @@ export class GetCurrentUserUseCase {
 
   async execute(): Promise<UserDTO | null> {
     // 1. Get current session
-    const session = await this.sessionManager.getCurrentSession();
+    const session = await this.sessionManager.getCurrentSession()
 
     if (!session) {
-      return null;
+      return null
     }
 
     // 2. Get user from session
-    const user = session.user;
+    const user = session.user
 
     // 3. Get profile data
-    const profile = await this.userRepository.findProfileById(user.getId());
+    const profile = await this.userRepository.findProfileById(user.getId())
 
     // 4. Map to DTO
     return {
@@ -31,6 +31,6 @@ export class GetCurrentUserUseCase {
       avatarUrl: profile?.getAvatarUrl(),
       createdAt: user.getCreatedAt(),
       lastLoginAt: user.getLastLoginAt(),
-    };
+    }
   }
 }
