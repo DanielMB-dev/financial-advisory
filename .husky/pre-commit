@@ -2,11 +2,21 @@ echo "🔍 Running pre-commit checks..."
 
 # Run lint-staged (formatting + lint fixes)
 npx lint-staged
-npm run format 
+npm run format
 npm run lint
 
-# Optional: lightweight type check
+# Type check
+echo "📝 Running type check..."
 npm run type-check --silent || exit 1
 
-# Optional: run quick tests (skip heavy ones)
-npm run test -- --passWithNoTests --silent || exit 1
+# Run tests with coverage
+echo "🧪 Running tests with coverage..."
+npm run test:ci || {
+  echo "❌ Tests or coverage failed. Commit aborted."
+  echo "💡 Coverage must meet thresholds:"
+  echo "   - Statements: 70%"
+  echo "   - Branches: 70%"
+  echo "   - Functions: 70%"
+  echo "   - Lines: 70%"
+  exit 1
+}
