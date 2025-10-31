@@ -53,6 +53,17 @@
     "@vitest/ui": "^4.0.5",
     "dotenv": "^17.2.3",
     "eslint": "^9",
-    "eslint-config-next": "16.0.1"
+    "eslint-config-next": "16.0.1",
+    "husky": "^9.1.7",
+    "jsdom": "^27.0.1",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2",
+    "vitest": "^4.0.5"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,css,md}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   }
 }
