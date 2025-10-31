@@ -174,7 +174,7 @@ describe('Rate Limiting', () => {
   describe('withRateLimit Wrapper', () => {
     it('should allow requests within rate limit using wrapper', async () => {
       const handler = withRateLimit(
-        async (request: NextRequest) => {
+        async (_request: NextRequest) => {
           return NextResponse.json({ success: true })
         },
         { limit: 5, window: 60000 }
@@ -195,7 +195,7 @@ describe('Rate Limiting', () => {
 
     it('should block requests exceeding rate limit using wrapper', async () => {
       const handler = withRateLimit(
-        async (request: NextRequest) => {
+        async (_request: NextRequest) => {
           return NextResponse.json({ success: true })
         },
         { limit: 2, window: 60000 }
@@ -218,7 +218,7 @@ describe('Rate Limiting', () => {
 
     it('should add rate limit headers to successful responses', async () => {
       const handler = withRateLimit(
-        async (request: NextRequest) => {
+        async (_request: NextRequest) => {
           return NextResponse.json({ data: 'test' })
         },
         { limit: 10, window: 60000 }

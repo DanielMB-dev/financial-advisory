@@ -57,7 +57,7 @@ Sentry.init({
   sendDefaultPii: false,
 
   // Before send hook - sanitize data
-  beforeSend(event, hint) {
+  beforeSend(event, _hint) {
     // Don't send events if Sentry is disabled
     if (process.env.NEXT_PUBLIC_SENTRY_ENABLED === 'false') {
       return null

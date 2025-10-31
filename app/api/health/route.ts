@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
  * - 200 OK: Application is healthy
  * - 503 Service Unavailable: Application has issues
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Perform health checks
     const checks = {
