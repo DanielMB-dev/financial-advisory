@@ -3,7 +3,6 @@ import { RegisterUserUseCase } from '../RegisterUserUseCase'
 import { IAuthenticationService } from '../../ports/IAuthenticationService'
 import { IUserRepository } from '../../ports/IUserRepository'
 import { User } from '../../../domain/entities/User'
-import { UserProfile } from '../../../domain/entities/UserProfile'
 import { Email } from '../../../domain/value-objects/Email'
 import { UserId } from '../../../domain/value-objects/UserId'
 import { VerificationStatus } from '../../../domain/value-objects/VerificationStatus'
@@ -29,6 +28,7 @@ describe('RegisterUserUseCase', () => {
 
     userRepository = {
       createProfile: vi.fn(),
+      findProfileById: vi.fn(),
     } as unknown as IUserRepository
 
     useCase = new RegisterUserUseCase(authService, userRepository)
@@ -36,7 +36,6 @@ describe('RegisterUserUseCase', () => {
 
   it('should register user with valid email and password', async () => {
     vi.mocked(authService.registerWithEmail).mockResolvedValue(mockUser)
-    vi.mocked(userRepository.createProfile).mockResolvedValue({} as UserProfile)
 
     await useCase.execute({
       email: 'user@example.com',
@@ -47,7 +46,7 @@ describe('RegisterUserUseCase', () => {
       expect.objectContaining({ getValue: expect.any(Function) }),
       expect.objectContaining({ getValue: expect.any(Function) })
     )
-    expect(userRepository.createProfile).toHaveBeenCalled()
+    // Note: Profile creation is handled by database trigger, not manually
   })
 
   it('should throw error if email is invalid', async () => {
@@ -83,22 +82,23 @@ describe('RegisterUserUseCase', () => {
     ).rejects.toThrow(DuplicateEmailError)
   })
 
-  it('should create profile after user registration', async () => {
+  it('should emit UserRegistered event after registration', async () => {
     vi.mocked(authService.registerWithEmail).mockResolvedValue(mockUser)
-    const createProfileSpy = vi
-      .mocked(userRepository.createProfile)
-      .mockResolvedValue({} as UserProfile)
+    const consoleLogSpy = vi.spyOn(console, 'log')
 
     await useCase.execute({
       email: 'user@example.com',
       password: 'Password123',
     })
 
-    expect(createProfileSpy).toHaveBeenCalledWith(
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'UserRegistered event:',
       expect.objectContaining({
-        getUserId: expect.any(Function),
-        getEmail: expect.any(Function),
+        userId: expect.any(Object),
+        email: expect.any(Object),
       })
     )
+
+    consoleLogSpy.mockRestore()
   })
 })

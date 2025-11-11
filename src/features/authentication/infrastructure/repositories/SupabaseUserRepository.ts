@@ -4,6 +4,7 @@ import { UserProfile } from '../../domain/entities/UserProfile'
 import { UserId } from '../../domain/value-objects/UserId'
 import { Email } from '../../domain/value-objects/Email'
 import { createServerSupabaseClient } from '../supabase/server-client'
+import { createAdminClient } from '../supabase/admin-client'
 
 export class SupabaseUserRepository implements IUserRepository {
   async findById(userId: UserId): Promise<User | null> {
@@ -33,7 +34,9 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async createProfile(profile: UserProfile): Promise<UserProfile> {
-    const supabase = await createServerSupabaseClient()
+    // Use admin client to bypass RLS during registration
+    // At this point, user is created but not authenticated yet
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase
       .from('profiles')

@@ -7,9 +7,13 @@ import {
   InvalidCredentialsError,
 } from '../../../domain/errors/AuthenticationErrors'
 
-// Mock the Supabase client
+// Mock the Supabase clients
 vi.mock('../../supabase/server-client', () => ({
   createServerSupabaseClient: vi.fn(() => mockSupabaseClient),
+}))
+
+vi.mock('../../supabase/admin-client', () => ({
+  createAdminClient: vi.fn(() => mockAdminClient),
 }))
 
 const mockSupabaseClient = {
@@ -23,6 +27,16 @@ const mockSupabaseClient = {
     getUser: vi.fn(),
     verifyOtp: vi.fn(),
     resend: vi.fn(),
+  },
+}
+
+const mockAdminClient = {
+  auth: {
+    admin: {
+      createUser: vi.fn(),
+      inviteUserByEmail: vi.fn(),
+      listUsers: vi.fn(),
+    },
   },
 }
 
@@ -45,7 +59,7 @@ describe('SupabaseAuthAdapter', () => {
       }
 
       mockSupabaseClient.auth.signUp.mockResolvedValue({
-        data: { user: mockUser },
+        data: { user: mockUser, session: null },
         error: null,
       })
 
@@ -68,7 +82,7 @@ describe('SupabaseAuthAdapter', () => {
 
     it('should throw DuplicateEmailError if email already exists', async () => {
       mockSupabaseClient.auth.signUp.mockResolvedValue({
-        data: { user: null },
+        data: { user: null, session: null },
         error: { message: 'User already registered' },
       })
 

@@ -1,961 +1,129 @@
 # Authentication Frontend Implementation Plan
 
-**Feature**: Authentication and User Management
-**Framework**: Next.js 14+ with App Router
-**React Version**: 19.2.0
-**Date**: October 30, 2025
+**Date**: 2025-11-10
 **Status**: Ready for Implementation
+**Objective**: Complete frontend implementation following react-hook-form + React Query architecture
 
 ---
 
-## Table of Contents
+## Executive Summary
 
-1. [Overview](#overview)
-2. [Dependencies to Install](#dependencies-to-install)
-3. [Architecture Overview](#architecture-overview)
-4. [React Query Setup](#react-query-setup)
-5. [Supabase Client Setup](#supabase-client-setup)
-6. [Authentication Context](#authentication-context)
-7. [Data Layer: Schemas and Services](#data-layer-schemas-and-services)
-8. [Query Hooks](#query-hooks)
-9. [Mutation Hooks](#mutation-hooks)
-10. [Protected Routes Pattern](#protected-routes-pattern)
-11. [Form Management](#form-management)
-12. [UI Components](#ui-components)
-13. [Session Management](#session-management)
-14. [OAuth Flow](#oauth-flow)
-15. [Profile Completion Flow](#profile-completion-flow)
-16. [Error Handling](#error-handling)
-17. [Testing Strategy](#testing-strategy)
-18. [Important Notes](#important-notes)
+This plan provides **COMPLETE implementation details** for the authentication frontend refactor. The current implementation uses server actions, lacks critical UX features (confirmPassword, password toggle, live validation), and deviates from the architectural specifications.
 
----
+**Critical Issues to Fix:**
+1. ❌ RegisterForm missing `confirmPassword` field (AC1 requirement)
+2. ❌ No password visibility toggle (eye icon)
+3. ❌ No live password requirements indicator
+4. ❌ Forms use server actions instead of react-hook-form + React Query
+5. ❌ Missing proper form validation with inline error messages
+6. ❌ Missing hooks: `useUserQuery`, `usePasswordResetMutation`, `useUpdatePasswordMutation`
+7. ❌ Missing components: `PasswordInput`, `PasswordRequirements`, `GoogleAuthButton`
 
-## Overview
-
-This document provides a complete implementation plan for the authentication feature frontend. The architecture follows the feature-based structure with clear separation between:
-
-- **Data layer**: Services and schemas for API communication and validation
-- **Hooks layer**: Query hooks, mutation hooks, and context hooks
-- **Components layer**: UI components that consume hooks
-- **App layer**: Pages and layouts
-
-**Core Principles:**
-- React Query for server state management
-- Zod schemas for runtime validation and TypeScript types
-- Context API for auth state distribution
-- Service layer for API calls
-- Custom hooks for business logic
-- Pure presentation components
-
----
-
-## Dependencies to Install
-
-Install the following packages:
-
-```bash
-npm install @tanstack/react-query@^5.0.0 \
-  @tanstack/react-query-devtools@^5.0.0 \
-  @supabase/ssr@latest \
-  @supabase/supabase-js@latest \
-  react-hook-form@^7.0.0 \
-  @hookform/resolvers@^3.0.0 \
-  axios@^1.6.0
-```
-
-**Why these versions:**
-- `@tanstack/react-query@5.x` - Latest stable with React 19 support
-- `@supabase/ssr` - Cookie-based session management for Next.js App Router
-- `react-hook-form@7.x` - Performant form library with Zod integration
-- `axios` - HTTP client for API calls (already have Zod 4.1.12 in package.json)
+**Approach**: Path A - Update implementation to match specifications (3 hours estimated)
 
 ---
 
 ## Architecture Overview
 
-### Directory Structure
+### Feature-Based Architecture Layers
 
 ```
 src/features/authentication/
-├── data/
-│   ├── schemas/
-│   │   ├── auth.schema.ts           # Auth-related Zod schemas
-│   │   ├── user.schema.ts           # User profile schemas
-│   │   └── index.ts                 # Export all schemas
-│   └── services/
-│       ├── auth.service.ts          # Auth API calls
-│       ├── user.service.ts          # User profile API calls
-│       └── index.ts                 # Export all services
-├── hooks/
+├── data/                           # ✅ EXISTS - Data layer
+│   ├── schemas/                    # ✅ Zod schemas (already correct!)
+│   │   ├── auth.schema.ts          # Has registerRequestSchema WITH confirmPassword
+│   │   ├── user.schema.ts
+│   │   └── index.ts
+│   └── services/                   # ✅ Services (already correct!)
+│       ├── auth.service.ts         # Supabase auth methods
+│       ├── user.service.ts
+│       └── index.ts
+│
+├── hooks/                          # ⚠️ INCOMPLETE - Hooks layer
 │   ├── queries/
-│   │   ├── useSessionQuery.ts       # Session data query
-│   │   ├── useUserQuery.ts          # User profile query
-│   │   └── index.ts                 # Export all query hooks
+│   │   ├── useSessionQuery.ts      # ✅ EXISTS
+│   │   ├── useUserQuery.ts         # ❌ MISSING - NEED TO CREATE
+│   │   └── index.ts
 │   ├── mutations/
-│   │   ├── useLoginMutation.ts      # Login mutation
-│   │   ├── useRegisterMutation.ts   # Register mutation
-│   │   ├── useLogoutMutation.ts     # Logout mutation
-│   │   ├── usePasswordResetMutation.ts
-│   │   ├── useUpdatePasswordMutation.ts
-│   │   ├── useUpdateProfileMutation.ts
-│   │   └── index.ts                 # Export all mutation hooks
-│   ├── useAuthContext.tsx           # Auth context hook
-│   └── index.ts                     # Export all hooks
-├── components/
-│   ├── LoginForm.tsx
-│   ├── RegisterForm.tsx
-│   ├── ForgotPasswordForm.tsx
-│   ├── ResetPasswordForm.tsx
-│   ├── ProfileForm.tsx
-│   ├── ProfileCompletionModal.tsx
-│   ├── GoogleAuthButton.tsx
-│   ├── ProtectedRoute.tsx
+│   │   ├── useRegisterMutation.ts  # ✅ EXISTS (but needs update)
+│   │   ├── useLoginMutation.ts     # ✅ EXISTS
+│   │   ├── useLogoutMutation.ts    # ✅ EXISTS
+│   │   ├── useUpdateProfileMutation.ts # ✅ EXISTS
+│   │   ├── usePasswordResetMutation.ts    # ❌ MISSING - NEED TO CREATE
+│   │   ├── useUpdatePasswordMutation.ts   # ❌ MISSING - NEED TO CREATE
+│   │   └── index.ts
+│   ├── context/
+│   │   └── AuthContext.tsx         # ✅ EXISTS
 │   └── index.ts
-└── index.ts                          # Feature public API
-
-app/
-├── (auth)/
-│   ├── layout.tsx                   # Auth layout (unauthenticated)
-│   ├── login/
-│   │   └── page.tsx                 # Login page
-│   ├── register/
-│   │   └── page.tsx                 # Register page
-│   ├── forgot-password/
-│   │   └── page.tsx                 # Forgot password page
-│   ├── reset-password/
-│   │   └── page.tsx                 # Reset password page
-│   └── auth-callback/
-│       └── page.tsx                 # OAuth callback handler
-├── (dashboard)/
-│   ├── layout.tsx                   # Dashboard layout (authenticated)
-│   ├── page.tsx                     # Dashboard home
-│   └── profile/
-│       └── page.tsx                 # User profile page
-├── layout.tsx                       # Root layout (with QueryClientProvider)
-└── providers.tsx                    # Client-side providers
-
-lib/
-├── supabase/
-│   ├── client.ts                    # Browser Supabase client
-│   ├── server.ts                    # Server Supabase client
-│   └── middleware.ts                # Supabase middleware helper
-└── query-client.ts                  # React Query client config
+│
+└── components/                     # ⚠️ NEEDS REFACTORING
+    ├── RegisterForm.tsx            # ❌ BROKEN - Uses server actions, missing confirmPassword
+    ├── LoginForm.tsx               # ❌ BROKEN - Missing password toggle
+    ├── PasswordInput.tsx           # ❌ MISSING - NEED TO CREATE
+    ├── PasswordRequirements.tsx    # ❌ MISSING - NEED TO CREATE
+    ├── GoogleAuthButton.tsx        # ❌ MISSING - NEED TO CREATE
+    └── index.ts
 ```
 
 ---
 
-## React Query Setup
+## Current State Analysis
 
-### 1. Create Query Client Configuration
+### What Works ✅
 
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/lib/query-client.ts`
+#### Data Layer (COMPLETE)
+- **Schemas** (`data/schemas/auth.schema.ts`):
+  ```typescript
+  // Already has confirmPassword!
+  export const registerRequestSchema = z
+    .object({
+      email: emailValidator,
+      password: passwordValidator,
+      confirmPassword: z.string().min(1, { message: 'Please confirm your password' }),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: "Passwords don't match",
+      path: ['confirmPassword'],
+    })
+  ```
 
-```typescript
-import { QueryClient, DefaultOptions } from '@tanstack/react-query'
+- **Services** (`data/services/auth.service.ts`):
+  - `login()`, `register()`, `logout()`
+  - `requestPasswordReset()`, `updatePassword()`
+  - `getSession()`, `refreshSession()`
+  - `loginWithGoogle()`
 
-const queryConfig: DefaultOptions = {
-  queries: {
-    // Stale time for auth queries - session data doesn't change often
-    staleTime: 1000 * 60 * 5, // 5 minutes
+#### Hooks Layer (PARTIAL)
+- ✅ `useSessionQuery.ts` - Fetch current session
+- ✅ `useRegisterMutation.ts` - Register user
+- ✅ `useLoginMutation.ts` - Login user
+- ✅ `useLogoutMutation.ts` - Logout user
+- ✅ `useUpdateProfileMutation.ts` - Update profile
+- ✅ `AuthContext.tsx` - Auth state context
 
-    // Retry failed queries
-    retry: (failureCount, error: any) => {
-      // Don't retry on auth errors
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        return false
-      }
-      return failureCount < 3
-    },
+### What's Broken ❌
 
-    // Refetch on window focus for auth data
-    refetchOnWindowFocus: true,
+#### Missing Hooks
+1. **`useUserQuery.ts`** - Fetch user profile
+2. **`usePasswordResetMutation.ts`** - Request password reset
+3. **`useUpdatePasswordMutation.ts`** - Update password with token
 
-    // Don't refetch on mount if data is fresh
-    refetchOnMount: false,
-  },
-  mutations: {
-    // Retry mutations only on network errors
-    retry: (failureCount, error: any) => {
-      if (error?.response?.status >= 400 && error?.response?.status < 500) {
-        return false // Don't retry client errors
-      }
-      return failureCount < 2
-    },
-  },
-}
+#### Broken Components
+1. **`RegisterForm.tsx`** - Uses server actions, missing confirmPassword
+2. **`LoginForm.tsx`** - Missing password toggle
 
-// Create a function to make a new query client
-// This is used in both client and server components
-export function makeQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: queryConfig,
-  })
-}
-
-// Browser query client (singleton)
-let browserQueryClient: QueryClient | undefined = undefined
-
-export function getQueryClient(): QueryClient {
-  if (typeof window === 'undefined') {
-    // Server: always make a new query client
-    return makeQueryClient()
-  } else {
-    // Browser: use singleton pattern to avoid re-creating on every render
-    if (!browserQueryClient) {
-      browserQueryClient = makeQueryClient()
-    }
-    return browserQueryClient
-  }
-}
-
-// Query keys factory for consistency
-export const queryKeys = {
-  auth: {
-    all: ['auth'] as const,
-    session: () => [...queryKeys.auth.all, 'session'] as const,
-    user: () => [...queryKeys.auth.all, 'user'] as const,
-  },
-  // Add more query keys as features are added
-  // profile: { ... },
-  // transactions: { ... },
-}
-```
-
-**Key Configuration Decisions:**
-
-- **5-minute stale time**: Auth data doesn't change frequently, reduce unnecessary refetches
-- **No retry on 401/403**: Authentication errors shouldn't be retried automatically
-- **Refetch on window focus**: Important for auth to detect session changes
-- **Query key factory**: Centralized query key management for cache invalidation
-- **Singleton pattern**: Avoid re-creating QueryClient on every render in browser
-
-### 2. Create Providers Component
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/app/providers.tsx`
-
-```typescript
-'use client'
-
-import { QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { useState, ReactNode } from 'react'
-import { getQueryClient } from '@/lib/query-client'
-import { AuthProvider } from '@/src/features/authentication/hooks/useAuthContext'
-import { isDev } from '@/lib/env'
-
-interface ProvidersProps {
-  children: ReactNode
-}
-
-export function Providers({ children }: ProvidersProps) {
-  // Create query client on mount to ensure it's only created once per page load
-  const [queryClient] = useState(() => getQueryClient())
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        {children}
-      </AuthProvider>
-      {isDev && <ReactQueryDevtools initialIsOpen={false} />}
-    </QueryClientProvider>
-  )
-}
-```
-
-**Why this structure:**
-- `'use client'` directive: Required for React Query in App Router
-- `useState` for client: Ensures QueryClient is created only once
-- `AuthProvider` nested: Auth context needs access to QueryClient
-- `ReactQueryDevtools`: Only in development for debugging
-
-### 3. Update Root Layout
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/app/layout.tsx`
-
-```typescript
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import './globals.css'
-import { Providers } from './providers'
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
-
-export const metadata: Metadata = {
-  title: 'Financial Advisor - Manage Your Finances',
-  description: 'Personal financial management and advisory platform',
-}
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
-  return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers>
-          {children}
-        </Providers>
-      </body>
-    </html>
-  )
-}
-```
+#### Missing Components
+1. **`PasswordInput.tsx`** - Password input with visibility toggle
+2. **`PasswordRequirements.tsx`** - Live password validation indicator
+3. **`GoogleAuthButton.tsx`** - Reusable Google OAuth button
 
 ---
 
-## Supabase Client Setup
+## Implementation Plan
 
-### 1. Browser Client
+### Phase 1: Create Missing Hooks (30 minutes)
 
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/lib/supabase/client.ts`
-
-```typescript
-import { createBrowserClient } from '@supabase/ssr'
-import { env } from '@/lib/env'
-
-// Create browser Supabase client
-// This is used in client components
-export function createClient() {
-  return createBrowserClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-}
-```
-
-### 2. Server Client
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/lib/supabase/server.ts`
-
-```typescript
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { env } from '@/lib/env'
-
-// Create server Supabase client
-// This is used in server components and API routes
-export async function createClient() {
-  const cookieStore = await cookies()
-
-  return createServerClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-      },
-    }
-  )
-}
-```
-
-### 3. Middleware Helper
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/lib/supabase/middleware.ts`
-
-```typescript
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-import { env } from '@/lib/env'
-
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
-
-  const supabase = createServerClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  // Protected routes
-  const protectedPaths = ['/dashboard', '/profile', '/transactions', '/reports']
-  const authPaths = ['/login', '/register', '/forgot-password']
-  const pathname = request.nextUrl.pathname
-
-  // Redirect to login if accessing protected route without session
-  if (!user && protectedPaths.some((path) => pathname.startsWith(path))) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    url.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(url)
-  }
-
-  // Redirect to dashboard if accessing auth pages with active session
-  if (user && authPaths.some((path) => pathname.startsWith(path))) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
-  }
-
-  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
-  // creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
-
-  return supabaseResponse
-}
-```
-
-### 4. Update Middleware
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/middleware.ts`
-
-Update the existing middleware to integrate Supabase session management:
-
-```typescript
-import { NextRequest, NextResponse } from 'next/server'
-import { updateSession } from './lib/supabase/middleware'
-
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-
-  // Skip middleware for static files and internal Next.js routes
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/_') ||
-    pathname.includes('.') // Static files
-  ) {
-    return NextResponse.next()
-  }
-
-  // Update Supabase session (handles auth redirects)
-  const supabaseResponse = await updateSession(request)
-
-  // Apply rate limiting to API routes
-  if (pathname.startsWith('/api/')) {
-    // More aggressive rate limiting for auth endpoints
-    if (pathname.startsWith('/api/auth/')) {
-      const { rateLimit } = await import('./lib/rate-limit')
-      const rateLimitResult = await rateLimit(request, {
-        limit: 5, // 5 requests
-        window: 60000, // per minute
-      })
-
-      if (!rateLimitResult.success) {
-        return rateLimitResult.response
-      }
-    } else {
-      // Standard rate limiting for other API routes
-      const { rateLimit } = await import('./lib/rate-limit')
-      const rateLimitResult = await rateLimit(request, {
-        limit: 60, // 60 requests
-        window: 60000, // per minute
-      })
-
-      if (!rateLimitResult.success) {
-        return rateLimitResult.response
-      }
-    }
-  }
-
-  // Log requests in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[${new Date().toISOString()}] ${request.method} ${pathname}`)
-  }
-
-  return supabaseResponse
-}
-
-export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
-}
-```
-
----
-
-## Data Layer: Schemas and Services
-
-### Zod Schemas
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/data/schemas/auth.schema.ts`
-
-```typescript
-import { z } from 'zod'
-
-// Password validation rules
-const passwordSchema = z
-  .string()
-  .min(8, 'Password must be at least 8 characters')
-  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number')
-
-// Email validation
-const emailSchema = z.string().email('Invalid email address')
-
-// Login Request
-export const loginRequestSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, 'Password is required'),
-})
-
-export type LoginRequest = z.infer<typeof loginRequestSchema>
-
-// Register Request
-export const registerRequestSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-})
-
-export type RegisterRequest = z.infer<typeof registerRequestSchema>
-
-// Password Reset Request
-export const passwordResetRequestSchema = z.object({
-  email: emailSchema,
-})
-
-export type PasswordResetRequest = z.infer<typeof passwordResetRequestSchema>
-
-// Update Password Request
-export const updatePasswordRequestSchema = z.object({
-  password: passwordSchema,
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-})
-
-export type UpdatePasswordRequest = z.infer<typeof updatePasswordRequestSchema>
-
-// Session Response
-export const sessionSchema = z.object({
-  accessToken: z.string(),
-  refreshToken: z.string(),
-  expiresAt: z.number(),
-  expiresIn: z.number(),
-  tokenType: z.string(),
-  user: z.object({
-    id: z.string(),
-    email: z.string(),
-    emailConfirmedAt: z.string().nullable(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  }),
-})
-
-export type Session = z.infer<typeof sessionSchema>
-
-// Auth Response
-export const authResponseSchema = z.object({
-  session: sessionSchema.nullable(),
-  user: sessionSchema.shape.user.nullable(),
-})
-
-export type AuthResponse = z.infer<typeof authResponseSchema>
-```
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/data/schemas/user.schema.ts`
-
-```typescript
-import { z } from 'zod'
-
-// User Profile Schema
-export const userProfileSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
-  fullName: z.string().nullable(),
-  avatarUrl: z.string().url().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-})
-
-export type UserProfile = z.infer<typeof userProfileSchema>
-
-// Update Profile Request
-export const updateProfileRequestSchema = z.object({
-  fullName: z.string().min(2, 'Name must be at least 2 characters').optional(),
-  avatarUrl: z.string().url('Invalid URL').optional(),
-})
-
-export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>
-
-// Profile Completion Request (for first-time users)
-export const profileCompletionSchema = z.object({
-  fullName: z.string().min(2, 'Name must be at least 2 characters'),
-})
-
-export type ProfileCompletion = z.infer<typeof profileCompletionSchema>
-```
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/data/schemas/index.ts`
-
-```typescript
-export * from './auth.schema'
-export * from './user.schema'
-```
-
-### Service Layer
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/data/services/auth.service.ts`
-
-```typescript
-import { createClient } from '@/lib/supabase/client'
-import type {
-  LoginRequest,
-  RegisterRequest,
-  PasswordResetRequest,
-  UpdatePasswordRequest,
-  AuthResponse,
-  Session,
-} from '../schemas'
-
-const supabase = createClient()
-
-/**
- * Auth Service
- * Handles all authentication-related API calls
- */
-export const authService = {
-  /**
-   * Login with email and password
-   */
-  async login(data: LoginRequest): Promise<AuthResponse> {
-    const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    })
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    return {
-      session: authData.session,
-      user: authData.user,
-    }
-  },
-
-  /**
-   * Register new user
-   */
-  async register(data: RegisterRequest): Promise<AuthResponse> {
-    const { data: authData, error } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth-callback`,
-      },
-    })
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    return {
-      session: authData.session,
-      user: authData.user,
-    }
-  },
-
-  /**
-   * Logout current user
-   */
-  async logout(): Promise<void> {
-    const { error } = await supabase.auth.signOut()
-
-    if (error) {
-      throw new Error(error.message)
-    }
-  },
-
-  /**
-   * Request password reset email
-   */
-  async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
-    const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-
-    if (error) {
-      throw new Error(error.message)
-    }
-  },
-
-  /**
-   * Update password with reset token
-   */
-  async updatePassword(data: UpdatePasswordRequest): Promise<void> {
-    const { error } = await supabase.auth.updateUser({
-      password: data.password,
-    })
-
-    if (error) {
-      throw new Error(error.message)
-    }
-  },
-
-  /**
-   * Get current session
-   */
-  async getSession(): Promise<Session | null> {
-    const { data, error } = await supabase.auth.getSession()
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    return data.session
-  },
-
-  /**
-   * Refresh session
-   */
-  async refreshSession(): Promise<Session | null> {
-    const { data, error } = await supabase.auth.refreshSession()
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    return data.session
-  },
-
-  /**
-   * Login with Google OAuth
-   */
-  async loginWithGoogle(): Promise<void> {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth-callback`,
-      },
-    })
-
-    if (error) {
-      throw new Error(error.message)
-    }
-  },
-}
-```
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/data/services/user.service.ts`
-
-```typescript
-import { createClient } from '@/lib/supabase/client'
-import type { UserProfile, UpdateProfileRequest } from '../schemas'
-
-const supabase = createClient()
-
-/**
- * User Service
- * Handles user profile-related API calls
- */
-export const userService = {
-  /**
-   * Get current user profile
-   */
-  async getProfile(): Promise<UserProfile | null> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return null
-    }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (error) {
-      // Profile might not exist yet (new user)
-      if (error.code === 'PGRST116') {
-        return null
-      }
-      throw new Error(error.message)
-    }
-
-    return {
-      id: data.id,
-      email: data.email,
-      fullName: data.full_name,
-      avatarUrl: data.avatar_url,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    }
-  },
-
-  /**
-   * Update user profile
-   */
-  async updateProfile(data: UpdateProfileRequest): Promise<UserProfile> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      throw new Error('User not authenticated')
-    }
-
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: data.fullName,
-        avatar_url: data.avatarUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    return {
-      id: profile.id,
-      email: profile.email,
-      fullName: profile.full_name,
-      avatarUrl: profile.avatar_url,
-      createdAt: profile.created_at,
-      updatedAt: profile.updated_at,
-    }
-  },
-
-  /**
-   * Create user profile (for new users)
-   */
-  async createProfile(userId: string, email: string, fullName?: string): Promise<UserProfile> {
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({
-        id: userId,
-        email,
-        full_name: fullName || null,
-        avatar_url: null,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    return {
-      id: data.id,
-      email: data.email,
-      fullName: data.full_name,
-      avatarUrl: data.avatar_url,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    }
-  },
-}
-```
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/data/services/index.ts`
-
-```typescript
-export * from './auth.service'
-export * from './user.service'
-```
-
----
-
-## Query Hooks
-
-### Session Query Hook
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/queries/useSessionQuery.ts`
-
-```typescript
-import { useQuery, UseQueryResult } from '@tanstack/react-query'
-import { queryKeys } from '@/lib/query-client'
-import { authService } from '../../data/services'
-import type { Session } from '../../data/schemas'
-
-/**
- * Hook to fetch current session
- *
- * @returns Query result with session data
- *
- * @example
- * ```tsx
- * const { data: session, isLoading } = useSessionQuery()
- *
- * if (isLoading) return <Spinner />
- * if (!session) return <LoginPrompt />
- *
- * return <Dashboard session={session} />
- * ```
- */
-export function useSessionQuery(): UseQueryResult<Session | null, Error> {
-  return useQuery({
-    queryKey: queryKeys.auth.session(),
-    queryFn: () => authService.getSession(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    retry: false, // Don't retry session fetch
-  })
-}
-```
-
-### User Profile Query Hook
+#### 1.1 Create `useUserQuery.ts`
 
 **File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/queries/useUserQuery.ts`
 
@@ -967,18 +135,7 @@ import type { UserProfile } from '../../data/schemas'
 
 /**
  * Hook to fetch user profile
- *
- * @returns Query result with user profile data
- *
- * @example
- * ```tsx
- * const { data: profile, isLoading } = useUserQuery()
- *
- * if (isLoading) return <Skeleton />
- * if (!profile) return <CompleteProfile />
- *
- * return <ProfileCard profile={profile} />
- * ```
+ * Uses React Query for caching and automatic refetching
  */
 export function useUserQuery(): UseQueryResult<UserProfile | null, Error> {
   return useQuery({
@@ -990,211 +147,17 @@ export function useUserQuery(): UseQueryResult<UserProfile | null, Error> {
 }
 ```
 
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/queries/index.ts`
+**Dependencies**:
+- Service: `userService.getProfile()` should exist in `user.service.ts`
+- Query key: Already defined in `/lib/query-client.ts` as `queryKeys.auth.user()`
 
-```typescript
-export * from './useSessionQuery'
-export * from './useUserQuery'
-```
-
----
-
-## Mutation Hooks
-
-### Login Mutation
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/useLoginMutation.ts`
-
-```typescript
-import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
-import { queryKeys } from '@/lib/query-client'
-import { authService } from '../../data/services'
-import type { LoginRequest, AuthResponse } from '../../data/schemas'
-
-interface UseLoginMutationReturn {
-  login: UseMutationResult<AuthResponse, Error, LoginRequest>['mutate']
-  loginAsync: UseMutationResult<AuthResponse, Error, LoginRequest>['mutateAsync']
-  isLoading: boolean
-  error: Error | null
-  isSuccess: boolean
-}
-
-/**
- * Hook to handle user login
- *
- * @returns Mutation object with login function
- *
- * @example
- * ```tsx
- * const { login, isLoading, error } = useLoginMutation()
- *
- * const handleSubmit = (data: LoginRequest) => {
- *   login(data, {
- *     onSuccess: () => {
- *       router.push('/dashboard')
- *     },
- *   })
- * }
- * ```
- */
-export function useLoginMutation(): UseLoginMutationReturn {
-  const queryClient = useQueryClient()
-  const router = useRouter()
-
-  const mutation = useMutation({
-    mutationFn: (data: LoginRequest) => authService.login(data),
-    onSuccess: (data) => {
-      // Invalidate and refetch session/user queries
-      queryClient.invalidateQueries({ queryKey: queryKeys.auth.session() })
-      queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
-
-      // Set session data in cache
-      queryClient.setQueryData(queryKeys.auth.session(), data.session)
-
-      // Redirect handled by parent component or callback
-    },
-  })
-
-  return {
-    login: mutation.mutate,
-    loginAsync: mutation.mutateAsync,
-    isLoading: mutation.isPending,
-    error: mutation.error,
-    isSuccess: mutation.isSuccess,
-  }
-}
-```
-
-### Register Mutation
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/useRegisterMutation.ts`
-
-```typescript
-import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query'
-import { queryKeys } from '@/lib/query-client'
-import { authService } from '../../data/services'
-import type { RegisterRequest, AuthResponse } from '../../data/schemas'
-
-interface UseRegisterMutationReturn {
-  register: UseMutationResult<AuthResponse, Error, RegisterRequest>['mutate']
-  registerAsync: UseMutationResult<AuthResponse, Error, RegisterRequest>['mutateAsync']
-  isLoading: boolean
-  error: Error | null
-  isSuccess: boolean
-}
-
-/**
- * Hook to handle user registration
- *
- * @returns Mutation object with register function
- *
- * @example
- * ```tsx
- * const { register, isLoading, error } = useRegisterMutation()
- *
- * const handleSubmit = (data: RegisterRequest) => {
- *   register(data, {
- *     onSuccess: () => {
- *       // Show email verification message
- *     },
- *   })
- * }
- * ```
- */
-export function useRegisterMutation(): UseRegisterMutationReturn {
-  const queryClient = useQueryClient()
-
-  const mutation = useMutation({
-    mutationFn: (data: RegisterRequest) => authService.register(data),
-    onSuccess: (data) => {
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: queryKeys.auth.session() })
-      queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
-
-      // Set session if auto-confirmed
-      if (data.session) {
-        queryClient.setQueryData(queryKeys.auth.session(), data.session)
-      }
-    },
-  })
-
-  return {
-    register: mutation.mutate,
-    registerAsync: mutation.mutateAsync,
-    isLoading: mutation.isPending,
-    error: mutation.error,
-    isSuccess: mutation.isSuccess,
-  }
-}
-```
-
-### Logout Mutation
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/useLogoutMutation.ts`
-
-```typescript
-import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
-import { queryKeys } from '@/lib/query-client'
-import { authService } from '../../data/services'
-
-interface UseLogoutMutationReturn {
-  logout: UseMutationResult<void, Error, void>['mutate']
-  logoutAsync: UseMutationResult<void, Error, void>['mutateAsync']
-  isLoading: boolean
-  error: Error | null
-  isSuccess: boolean
-}
-
-/**
- * Hook to handle user logout
- *
- * @returns Mutation object with logout function
- *
- * @example
- * ```tsx
- * const { logout, isLoading } = useLogoutMutation()
- *
- * const handleLogout = () => {
- *   logout()
- * }
- * ```
- */
-export function useLogoutMutation(): UseLogoutMutationReturn {
-  const queryClient = useQueryClient()
-  const router = useRouter()
-
-  const mutation = useMutation({
-    mutationFn: () => authService.logout(),
-    onSuccess: () => {
-      // Clear all auth-related cache
-      queryClient.removeQueries({ queryKey: queryKeys.auth.all })
-
-      // Clear entire cache to remove user data
-      queryClient.clear()
-
-      // Redirect to login
-      router.push('/login')
-    },
-  })
-
-  return {
-    logout: mutation.mutate,
-    logoutAsync: mutation.mutateAsync,
-    isLoading: mutation.isPending,
-    error: mutation.error,
-    isSuccess: mutation.isSuccess,
-  }
-}
-```
-
-### Password Reset Mutation
+#### 1.2 Create `usePasswordResetMutation.ts`
 
 **File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/usePasswordResetMutation.ts`
 
 ```typescript
 import { useMutation, UseMutationResult } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { authService } from '../../data/services'
 import type { PasswordResetRequest } from '../../data/schemas'
 
@@ -1208,25 +171,22 @@ interface UsePasswordResetMutationReturn {
 
 /**
  * Hook to request password reset
- *
- * @returns Mutation object with requestReset function
- *
- * @example
- * ```tsx
- * const { requestReset, isLoading, isSuccess } = usePasswordResetMutation()
- *
- * const handleSubmit = (data: PasswordResetRequest) => {
- *   requestReset(data)
- * }
- *
- * if (isSuccess) {
- *   return <Message>Check your email for reset link</Message>
- * }
- * ```
+ * Sends reset email via Supabase
  */
 export function usePasswordResetMutation(): UsePasswordResetMutationReturn {
   const mutation = useMutation({
     mutationFn: (data: PasswordResetRequest) => authService.requestPasswordReset(data),
+    onSuccess: () => {
+      toast.success('Password reset email sent', {
+        description: 'Please check your email for the reset link.',
+        duration: 5000,
+      })
+    },
+    onError: (error) => {
+      toast.error('Failed to send reset email', {
+        description: error.message || 'Please try again later.',
+      })
+    },
   })
 
   return {
@@ -1239,13 +199,18 @@ export function usePasswordResetMutation(): UsePasswordResetMutationReturn {
 }
 ```
 
-### Update Password Mutation
+**Dependencies**:
+- Service: `authService.requestPasswordReset()` already exists in `auth.service.ts`
+- Schema: `PasswordResetRequest` already exists in `auth.schema.ts`
+
+#### 1.3 Create `useUpdatePasswordMutation.ts`
 
 **File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/useUpdatePasswordMutation.ts`
 
 ```typescript
 import { useMutation, UseMutationResult } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { authService } from '../../data/services'
 import type { UpdatePasswordRequest } from '../../data/schemas'
 
@@ -1259,21 +224,7 @@ interface UseUpdatePasswordMutationReturn {
 
 /**
  * Hook to update password with reset token
- *
- * @returns Mutation object with updatePassword function
- *
- * @example
- * ```tsx
- * const { updatePassword, isLoading, isSuccess } = useUpdatePasswordMutation()
- *
- * const handleSubmit = (data: UpdatePasswordRequest) => {
- *   updatePassword(data, {
- *     onSuccess: () => {
- *       router.push('/login')
- *     },
- *   })
- * }
- * ```
+ * Redirects to login on success
  */
 export function useUpdatePasswordMutation(): UseUpdatePasswordMutationReturn {
   const router = useRouter()
@@ -1281,8 +232,20 @@ export function useUpdatePasswordMutation(): UseUpdatePasswordMutationReturn {
   const mutation = useMutation({
     mutationFn: (data: UpdatePasswordRequest) => authService.updatePassword(data),
     onSuccess: () => {
-      // Redirect to login after successful password update
-      router.push('/login?message=password-updated')
+      toast.success('Password updated successfully', {
+        description: 'You can now log in with your new password.',
+        duration: 5000,
+      })
+
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        router.push('/login?message=password-updated')
+      }, 2000)
+    },
+    onError: (error) => {
+      toast.error('Failed to update password', {
+        description: error.message || 'Please try again or request a new reset link.',
+      })
     },
   })
 
@@ -1296,441 +259,204 @@ export function useUpdatePasswordMutation(): UseUpdatePasswordMutationReturn {
 }
 ```
 
-### Update Profile Mutation
+**Dependencies**:
+- Service: `authService.updatePassword()` already exists in `auth.service.ts`
+- Schema: `UpdatePasswordRequest` already exists in `auth.schema.ts`
 
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/useUpdateProfileMutation.ts`
+#### 1.4 Update Index Files
+
+**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/queries/index.ts`
 
 ```typescript
-import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-query'
-import { queryKeys } from '@/lib/query-client'
-import { userService } from '../../data/services'
-import type { UpdateProfileRequest, UserProfile } from '../../data/schemas'
-
-interface UseUpdateProfileMutationReturn {
-  updateProfile: UseMutationResult<UserProfile, Error, UpdateProfileRequest>['mutate']
-  updateProfileAsync: UseMutationResult<UserProfile, Error, UpdateProfileRequest>['mutateAsync']
-  isLoading: boolean
-  error: Error | null
-  isSuccess: boolean
-}
-
-/**
- * Hook to update user profile
- *
- * @returns Mutation object with updateProfile function
- *
- * @example
- * ```tsx
- * const { updateProfile, isLoading } = useUpdateProfileMutation()
- *
- * const handleSubmit = (data: UpdateProfileRequest) => {
- *   updateProfile(data, {
- *     onSuccess: (updatedProfile) => {
- *       toast.success('Profile updated')
- *     },
- *   })
- * }
- * ```
- */
-export function useUpdateProfileMutation(): UseUpdateProfileMutationReturn {
-  const queryClient = useQueryClient()
-
-  const mutation = useMutation({
-    mutationFn: (data: UpdateProfileRequest) => userService.updateProfile(data),
-    onSuccess: (updatedProfile) => {
-      // Update user query cache with new profile
-      queryClient.setQueryData(queryKeys.auth.user(), updatedProfile)
-    },
-  })
-
-  return {
-    updateProfile: mutation.mutate,
-    updateProfileAsync: mutation.mutateAsync,
-    isLoading: mutation.isPending,
-    error: mutation.error,
-    isSuccess: mutation.isSuccess,
-  }
-}
+export * from './useSessionQuery'
+export * from './useUserQuery'  // ADD THIS
 ```
 
 **File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/index.ts`
 
 ```typescript
 export * from './useLoginMutation'
-export * from './useRegisterMutation'
 export * from './useLogoutMutation'
-export * from './usePasswordResetMutation'
-export * from './useUpdatePasswordMutation'
+export * from './useRegisterMutation'
 export * from './useUpdateProfileMutation'
+export * from './usePasswordResetMutation'    // ADD THIS
+export * from './useUpdatePasswordMutation'  // ADD THIS
 ```
 
 ---
 
-## Authentication Context
+### Phase 2: Create Reusable Components (1 hour)
 
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/useAuthContext.tsx`
+#### 2.1 Create `PasswordInput.tsx`
 
-```typescript
-'use client'
-
-import {
-  createContext,
-  useContext,
-  ReactNode,
-  useEffect,
-} from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { useQueryClient } from '@tanstack/react-query'
-import { queryKeys } from '@/lib/query-client'
-import { useSessionQuery } from './queries/useSessionQuery'
-import { useUserQuery } from './queries/useUserQuery'
-import type { Session, UserProfile } from '../data/schemas'
-
-interface AuthContextValue {
-  // State
-  session: Session | null | undefined
-  user: UserProfile | null | undefined
-  isLoading: boolean
-  isAuthenticated: boolean
-
-  // Helper methods
-  requireAuth: () => boolean
-  checkEmailVerified: () => boolean
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-
-interface AuthProviderProps {
-  children: ReactNode
-}
-
-/**
- * Auth Provider Component
- * Provides authentication state and operations to the entire app
- */
-export function AuthProvider({ children }: AuthProviderProps) {
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const supabase = createClient()
-
-  // Fetch session and user
-  const { data: session, isLoading: sessionLoading } = useSessionQuery()
-  const { data: user, isLoading: userLoading } = useUserQuery()
-
-  const isLoading = sessionLoading || userLoading
-  const isAuthenticated = !!session && !!user
-
-  // Listen to auth state changes
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      // Invalidate queries when auth state changes
-      if (event === 'SIGNED_IN') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.auth.session() })
-        queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
-      }
-
-      if (event === 'SIGNED_OUT') {
-        queryClient.clear()
-        router.push('/login')
-      }
-
-      if (event === 'TOKEN_REFRESHED') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.auth.session() })
-      }
-
-      if (event === 'USER_UPDATED') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [supabase, queryClient, router])
-
-  /**
-   * Require authentication - redirect to login if not authenticated
-   */
-  const requireAuth = (): boolean => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login')
-      return false
-    }
-    return isAuthenticated
-  }
-
-  /**
-   * Check if user's email is verified
-   */
-  const checkEmailVerified = (): boolean => {
-    return !!session?.user?.emailConfirmedAt
-  }
-
-  const value: AuthContextValue = {
-    session,
-    user,
-    isLoading,
-    isAuthenticated,
-    requireAuth,
-    checkEmailVerified,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-/**
- * Hook to use auth context
- *
- * @returns Auth context value
- * @throws Error if used outside AuthProvider
- *
- * @example
- * ```tsx
- * const { user, isAuthenticated, isLoading } = useAuth()
- *
- * if (isLoading) return <Spinner />
- * if (!isAuthenticated) return <LoginPrompt />
- *
- * return <Welcome user={user} />
- * ```
- */
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext)
-
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-
-  return context
-}
-```
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/index.ts`
-
-```typescript
-export * from './useAuthContext'
-export * from './queries'
-export * from './mutations'
-```
-
----
-
-## Protected Routes Pattern
-
-### Protected Route Component
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/ProtectedRoute.tsx`
+**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/PasswordInput.tsx`
 
 ```typescript
 'use client'
 
-import { ReactNode, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '../hooks/useAuthContext'
+import { useState, forwardRef } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
-interface ProtectedRouteProps {
-  children: ReactNode
-  requireEmailVerification?: boolean
-  redirectTo?: string
-  loadingComponent?: ReactNode
+export interface PasswordInputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {
+  // Inherits all input props like placeholder, disabled, etc.
 }
 
 /**
- * Protected Route Component
- * Wraps content that requires authentication
+ * Password input with visibility toggle
  *
- * @example
+ * Features:
+ * - Eye icon to show/hide password
+ * - Accessible with proper aria-labels
+ * - Forwards ref for react-hook-form integration
+ * - Styled to match shadcn/ui Input component
+ *
+ * Usage:
  * ```tsx
- * <ProtectedRoute requireEmailVerification>
- *   <Dashboard />
- * </ProtectedRoute>
+ * <PasswordInput
+ *   placeholder="Enter password"
+ *   {...field}
+ * />
  * ```
  */
-export function ProtectedRoute({
-  children,
-  requireEmailVerification = false,
-  redirectTo = '/login',
-  loadingComponent = <div>Loading...</div>,
-}: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, checkEmailVerified } = useAuth()
-  const router = useRouter()
+export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
+  ({ className, ...props }, ref) => {
+    const [showPassword, setShowPassword] = useState(false)
 
-  useEffect(() => {
-    if (!isLoading) {
-      if (!isAuthenticated) {
-        router.push(redirectTo)
-      } else if (requireEmailVerification && !checkEmailVerified()) {
-        router.push('/verify-email')
-      }
-    }
-  }, [isAuthenticated, isLoading, requireEmailVerification, checkEmailVerified, router, redirectTo])
-
-  if (isLoading) {
-    return <>{loadingComponent}</>
-  }
-
-  if (!isAuthenticated) {
-    return null
-  }
-
-  if (requireEmailVerification && !checkEmailVerified()) {
-    return null
-  }
-
-  return <>{children}</>
-}
-```
-
-### Dashboard Layout with Protection
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/app/(dashboard)/layout.tsx`
-
-```typescript
-import { ProtectedRoute } from '@/src/features/authentication/components/ProtectedRoute'
-import { ReactNode } from 'react'
-
-export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-background">
-        {/* Sidebar, Header, etc. */}
-        <main>{children}</main>
+    return (
+      <div className="relative">
+        <Input
+          type={showPassword ? 'text' : 'password'}
+          className={className}
+          ref={ref}
+          {...props}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+          onClick={() => setShowPassword(!showPassword)}
+          aria-label={showPassword ? 'Hide password' : 'Show password'}
+          tabIndex={-1} // Don't include in tab order
+        >
+          {showPassword ? (
+            <EyeOff className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          )}
+        </Button>
       </div>
-    </ProtectedRoute>
+    )
+  }
+)
+
+PasswordInput.displayName = 'PasswordInput'
+```
+
+**Key Features**:
+- ✅ Eye/EyeOff icons from `lucide-react` (already installed)
+- ✅ Toggles between `type="password"` and `type="text"`
+- ✅ `forwardRef` for react-hook-form integration
+- ✅ Absolute positioned button (doesn't affect input width)
+- ✅ Accessible with aria-label
+- ✅ Uses shadcn/ui Button and Input components
+
+#### 2.2 Create `PasswordRequirements.tsx`
+
+**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/PasswordRequirements.tsx`
+
+```typescript
+'use client'
+
+import { Check, X } from 'lucide-react'
+
+interface Requirement {
+  label: string
+  test: (password: string) => boolean
+}
+
+/**
+ * Password requirements matching the Zod schema
+ * Must stay in sync with passwordValidator in auth.schema.ts
+ */
+const requirements: Requirement[] = [
+  {
+    label: 'At least 8 characters',
+    test: (pw) => pw.length >= 8
+  },
+  {
+    label: 'One uppercase letter',
+    test: (pw) => /[A-Z]/.test(pw)
+  },
+  {
+    label: 'One lowercase letter',
+    test: (pw) => /[a-z]/.test(pw)
+  },
+  {
+    label: 'One number',
+    test: (pw) => /[0-9]/.test(pw)
+  },
+]
+
+interface PasswordRequirementsProps {
+  password: string
+}
+
+/**
+ * Live password requirements indicator
+ *
+ * Features:
+ * - Updates as user types (re-renders on every keystroke)
+ * - Green check when requirement is met
+ * - Gray X when requirement is not met
+ * - Matches validation logic from Zod schema
+ *
+ * Usage:
+ * ```tsx
+ * const password = watch('password')
+ * {password && <PasswordRequirements password={password} />}
+ * ```
+ */
+export function PasswordRequirements({ password }: PasswordRequirementsProps) {
+  return (
+    <div className="space-y-1 text-sm" role="status" aria-live="polite">
+      {requirements.map((req, index) => {
+        const met = req.test(password)
+        return (
+          <div
+            key={index}
+            className={`flex items-center gap-2 transition-colors ${
+              met ? 'text-green-600' : 'text-muted-foreground'
+            }`}
+          >
+            {met ? (
+              <Check className="h-4 w-4" aria-label="Requirement met" />
+            ) : (
+              <X className="h-4 w-4" aria-label="Requirement not met" />
+            )}
+            <span>{req.label}</span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 ```
 
----
+**Key Features**:
+- ✅ Matches Zod `passwordValidator` rules exactly
+- ✅ Live updates (controlled by parent component's `watch('password')`)
+- ✅ Green text + Check icon when met
+- ✅ Gray text + X icon when not met
+- ✅ Smooth color transition with Tailwind
+- ✅ Accessible with `role="status"` and `aria-live="polite"`
 
-## Form Management
+**IMPORTANT**: This component must stay in sync with `passwordValidator` in `auth.schema.ts`. If you change validation rules, update both!
 
-### Login Form Example
-
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/LoginForm.tsx`
-
-```typescript
-'use client'
-
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { loginRequestSchema, type LoginRequest } from '../data/schemas'
-import { useLoginMutation } from '../hooks/mutations'
-
-export function LoginForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/dashboard'
-
-  const { login, isLoading, error } = useLoginMutation()
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginRequest>({
-    resolver: zodResolver(loginRequestSchema),
-  })
-
-  const onSubmit = (data: LoginRequest) => {
-    login(data, {
-      onSuccess: () => {
-        router.push(redirectTo)
-      },
-    })
-  }
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium">
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          {...register('email')}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-          disabled={isLoading}
-        />
-        {errors.email && (
-          <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-        )}
-      </div>
-
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium">
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          {...register('password')}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-          disabled={isLoading}
-        />
-        {errors.password && (
-          <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-        )}
-      </div>
-
-      {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <p className="text-sm text-red-800">{error.message}</p>
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        {isLoading ? 'Signing in...' : 'Sign in'}
-      </button>
-    </form>
-  )
-}
-```
-
-**Pattern for all forms:**
-1. Use `react-hook-form` with `zodResolver`
-2. Import schema from `data/schemas`
-3. Use mutation hook from `hooks/mutations`
-4. Handle loading, error, and success states
-5. Display validation errors from schema
-6. Display API errors from mutation
-
----
-
-## Session Management
-
-Session management is handled automatically by:
-
-1. **Supabase Client**: Manages token storage and refresh
-2. **Middleware**: Updates session on every request
-3. **React Query**: Caches session data
-4. **Auth Context**: Listens to auth state changes
-
-**Token Refresh Strategy:**
-- Supabase automatically refreshes tokens before expiry
-- Middleware updates cookies on every request
-- `TOKEN_REFRESHED` event invalidates React Query cache
-- No manual refresh needed in most cases
-
-**Session Expiration:**
-- Configured in Supabase dashboard (default 7 days)
-- Multiple sessions allowed per user
-- Middleware redirects to login on expired session
-
----
-
-## OAuth Flow
-
-### Google OAuth Button
+#### 2.3 Create `GoogleAuthButton.tsx`
 
 **File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/GoogleAuthButton.tsx`
 
@@ -1738,8 +464,23 @@ Session management is handled automatically by:
 'use client'
 
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { authService } from '../data/services'
 
+/**
+ * Google OAuth authentication button
+ *
+ * Features:
+ * - Google logo SVG
+ * - Loading state during OAuth redirect
+ * - Error handling (shows toast on error)
+ * - Automatic redirect via Supabase
+ *
+ * Usage:
+ * ```tsx
+ * <GoogleAuthButton />
+ * ```
+ */
 export function GoogleAuthButton() {
   const [isLoading, setIsLoading] = useState(false)
 
@@ -1751,542 +492,765 @@ export function GoogleAuthButton() {
     } catch (error) {
       console.error('Google login error:', error)
       setIsLoading(false)
+      // Error toast is already shown by the service
     }
   }
 
   return (
-    <button
+    <Button
+      type="button"
+      variant="outline"
+      className="w-full"
       onClick={handleGoogleLogin}
       disabled={isLoading}
-      className="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
     >
+      {/* Google Logo SVG */}
+      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+          fill="#4285F4"
+        />
+        <path
+          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+          fill="#34A853"
+        />
+        <path
+          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+          fill="#FBBC05"
+        />
+        <path
+          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+          fill="#EA4335"
+        />
+      </svg>
       {isLoading ? 'Connecting...' : 'Continue with Google'}
-    </button>
+    </Button>
   )
 }
 ```
 
-### OAuth Callback Handler
+**Key Features**:
+- ✅ Official Google colors in SVG logo
+- ✅ Loading state with text change
+- ✅ Uses existing `authService.loginWithGoogle()` method
+- ✅ Button is `type="button"` (won't submit parent form)
+- ✅ Variant="outline" for secondary action styling
 
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/app/(auth)/auth-callback/page.tsx`
+#### 2.4 Update Components Index
+
+**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/index.ts`
 
 ```typescript
-'use client'
-
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-
-export default function AuthCallbackPage() {
-  const router = useRouter()
-  const supabase = createClient()
-
-  useEffect(() => {
-    const handleCallback = async () => {
-      // Supabase handles the code exchange automatically
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (session) {
-        // Check if profile exists
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-
-        if (!profile) {
-          // New user - redirect to profile completion
-          router.push('/complete-profile')
-        } else {
-          // Existing user - redirect to dashboard
-          router.push('/dashboard')
-        }
-      } else {
-        // No session - redirect to login
-        router.push('/login?error=auth-failed')
-      }
-    }
-
-    handleCallback()
-  }, [router, supabase])
-
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p>Completing authentication...</p>
-    </div>
-  )
-}
+export * from './RegisterForm'
+export * from './LoginForm'
+export * from './PasswordInput'        // ADD
+export * from './PasswordRequirements' // ADD
+export * from './GoogleAuthButton'     // ADD
 ```
-
-**OAuth Flow:**
-1. User clicks "Continue with Google"
-2. `loginWithGoogle()` initiates OAuth flow
-3. User authenticates on Google
-4. Google redirects to `/auth-callback`
-5. Supabase exchanges code for session
-6. Check if profile exists
-7. Redirect to profile completion or dashboard
 
 ---
 
-## Profile Completion Flow
+### Phase 3: Refactor Forms (1 hour)
 
-### Profile Completion Modal
+#### 3.1 Refactor `RegisterForm.tsx`
 
-**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/ProfileCompletionModal.tsx`
+**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/RegisterForm.tsx`
+
+**REPLACE ENTIRE FILE** with:
 
 ```typescript
 'use client'
 
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { profileCompletionSchema, type ProfileCompletion } from '../data/schemas'
-import { useAuth } from '../hooks/useAuthContext'
-import { userService } from '../data/services'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { registerRequestSchema, type RegisterRequest } from '../data/schemas'
+import { useRegisterMutation } from '../hooks/mutations'
+import { PasswordInput } from './PasswordInput'
+import { PasswordRequirements } from './PasswordRequirements'
+import { GoogleAuthButton } from './GoogleAuthButton'
 
-interface ProfileCompletionModalProps {
-  onComplete?: () => void
-  allowSkip?: boolean
-}
-
-export function ProfileCompletionModal({
-  onComplete,
-  allowSkip = false,
-}: ProfileCompletionModalProps) {
-  const { session } = useAuth()
+/**
+ * Registration form with email/password and Google OAuth
+ *
+ * Features:
+ * - react-hook-form for state management
+ * - Zod validation with inline error messages
+ * - confirmPassword field (AC1 requirement)
+ * - Password visibility toggle
+ * - Live password requirements indicator
+ * - Google OAuth button
+ * - Success toast on registration
+ * - Error toast on failure
+ *
+ * Form flow:
+ * 1. User fills email, password, confirmPassword
+ * 2. Password requirements show live validation
+ * 3. On submit: validate → register → toast → redirect to login
+ */
+export function RegisterForm() {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const { mutate: register, isPending: isLoading } = useRegisterMutation()
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ProfileCompletion>({
-    resolver: zodResolver(profileCompletionSchema),
+  // Setup react-hook-form with Zod validation
+  const form = useForm<RegisterRequest>({
+    resolver: zodResolver(registerRequestSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+    mode: 'onBlur', // Validate on blur for better UX (not on every keystroke)
   })
 
-  const onSubmit = async (data: ProfileCompletion) => {
-    if (!session?.user) return
+  // Watch password for live requirements indicator
+  const password = form.watch('password')
 
-    try {
-      setIsLoading(true)
-      await userService.createProfile(session.user.id, session.user.email, data.fullName)
-      onComplete?.()
-      router.push('/dashboard')
-    } catch (error) {
-      console.error('Profile completion error:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleSkip = () => {
-    onComplete?.()
-    router.push('/dashboard')
+  async function onSubmit(values: RegisterRequest) {
+    register(values, {
+      onSuccess: () => {
+        // Success toast is already shown in the mutation hook
+        // Redirect to login page
+        router.push('/login?message=check-email')
+      },
+      // Error toast is already shown in the mutation hook
+    })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="mb-4 text-2xl font-bold">Complete Your Profile</h2>
-        <p className="mb-6 text-gray-600">
-          Help us personalize your experience by completing your profile.
-        </p>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label htmlFor="fullName" className="block text-sm font-medium">
-              Full Name
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              {...register('fullName')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-              disabled={isLoading}
-            />
-            {errors.fullName && (
-              <p className="mt-1 text-sm text-red-600">{errors.fullName.message}</p>
+    <div className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {/* Email Field */}
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    {...field}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
-          <div className="flex gap-2">
-            {allowSkip && (
-              <button
-                type="button"
-                onClick={handleSkip}
-                className="flex-1 rounded-md border border-gray-300 px-4 py-2 hover:bg-gray-50"
-                disabled={isLoading}
-              >
-                Skip for now
-              </button>
+          {/* Password Field */}
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <PasswordInput
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    {...field}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+                {/* Show live password requirements when user starts typing */}
+                {password && <PasswordRequirements password={password} />}
+                <FormMessage />
+              </FormItem>
             )}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Saving...' : 'Continue'}
-            </button>
-          </div>
+          />
+
+          {/* Confirm Password Field - AC1 REQUIREMENT */}
+          <FormField
+            control={form.control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm Password</FormLabel>
+                <FormControl>
+                  <PasswordInput
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    {...field}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Submit Button */}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Creating account...' : 'Create account'}
+          </Button>
         </form>
-      </div>
-    </div>
-  )
-}
-```
+      </Form>
 
-**When to Show Profile Completion:**
-- After OAuth registration (no profile exists)
-- After email registration if auto-confirm is enabled
-- As a dismissible modal in dashboard if profile incomplete
-- Can be skipped or required based on `allowSkip` prop
-
----
-
-## Error Handling
-
-### Error Display Pattern
-
-Create reusable error components:
-
-```typescript
-// components/ErrorMessage.tsx
-export function ErrorMessage({ error }: { error: Error | null }) {
-  if (!error) return null
-
-  return (
-    <div className="rounded-md bg-red-50 p-4">
-      <div className="flex">
-        <div className="ml-3">
-          <h3 className="text-sm font-medium text-red-800">Error</h3>
-          <div className="mt-2 text-sm text-red-700">
-            <p>{error.message}</p>
-          </div>
+      {/* Separator */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <Separator />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Or continue with
+          </span>
         </div>
       </div>
+
+      {/* Google OAuth */}
+      <GoogleAuthButton />
+
+      {/* Login Link */}
+      <p className="text-center text-sm text-muted-foreground">
+        Already have an account?{' '}
+        <Link href="/login" className="font-medium hover:underline">
+          Log in
+        </Link>
+      </p>
     </div>
   )
 }
 ```
 
-**Error Handling Strategy:**
-1. **Validation Errors**: Caught by Zod schemas, displayed inline
-2. **API Errors**: Caught by mutation hooks, displayed in form
-3. **Network Errors**: Handled by React Query retry logic
-4. **Auth Errors**: Handled by middleware and auth context
+**Key Changes**:
+1. ✅ **react-hook-form** replaces server actions
+2. ✅ **zodResolver** for validation
+3. ✅ **confirmPassword field** added (AC1)
+4. ✅ **PasswordInput** component used
+5. ✅ **PasswordRequirements** shown live
+6. ✅ **GoogleAuthButton** component used
+7. ✅ **FormMessage** for inline errors
+8. ✅ **mode: 'onBlur'** for better UX
+9. ✅ Toast notifications handled in mutation hook
+10. ✅ Disabled state during loading
+
+#### 3.2 Refactor `LoginForm.tsx`
+
+**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/components/LoginForm.tsx`
+
+**REPLACE ENTIRE FILE** with:
+
+```typescript
+'use client'
+
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { loginRequestSchema, type LoginRequest } from '../data/schemas'
+import { useLoginMutation } from '../hooks/mutations'
+import { PasswordInput } from './PasswordInput'
+import { GoogleAuthButton } from './GoogleAuthButton'
+
+/**
+ * Login form with email/password and Google OAuth
+ *
+ * Features:
+ * - react-hook-form for state management
+ * - Zod validation with inline error messages
+ * - Password visibility toggle
+ * - Google OAuth button
+ * - Forgot password link
+ * - Success toast on login
+ * - Error toast on failure
+ * - Redirect to original destination or /dashboard
+ *
+ * Form flow:
+ * 1. User fills email, password
+ * 2. On submit: validate → login → toast → redirect
+ */
+export function LoginForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/dashboard'
+
+  const { mutate: login, isPending: isLoading } = useLoginMutation()
+
+  // Setup react-hook-form with Zod validation
+  const form = useForm<LoginRequest>({
+    resolver: zodResolver(loginRequestSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+    mode: 'onBlur', // Validate on blur for better UX
+  })
+
+  async function onSubmit(values: LoginRequest) {
+    login(values, {
+      onSuccess: () => {
+        // Success toast is already shown in the mutation hook
+        // Redirect to dashboard or original destination
+        router.push(redirectTo)
+      },
+      // Error toast is already shown in the mutation hook
+    })
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Google OAuth First */}
+      <GoogleAuthButton />
+
+      {/* Separator */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <Separator />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Or continue with
+          </span>
+        </div>
+      </div>
+
+      {/* Email/Password Form */}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {/* Email Field */}
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    {...field}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Password Field */}
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Password</FormLabel>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+                <FormControl>
+                  <PasswordInput
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    {...field}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Submit Button */}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Signing in...' : 'Sign in'}
+          </Button>
+        </form>
+      </Form>
+
+      {/* Register Link */}
+      <p className="text-center text-sm text-muted-foreground">
+        Don't have an account?{' '}
+        <Link href="/register" className="font-medium hover:underline">
+          Sign up
+        </Link>
+      </p>
+    </div>
+  )
+}
+```
+
+**Key Changes**:
+1. ✅ **react-hook-form** replaces server actions
+2. ✅ **zodResolver** for validation
+3. ✅ **PasswordInput** component used (with toggle)
+4. ✅ **GoogleAuthButton** component used
+5. ✅ **Forgot password link** in label row
+6. ✅ **FormMessage** for inline errors
+7. ✅ **Redirect support** via query param
+8. ✅ Toast notifications handled in mutation hook
+9. ✅ Google OAuth shown first (better UX)
+10. ✅ Disabled state during loading
 
 ---
 
-## Testing Strategy
+### Phase 4: Update Mutation Hook (If Needed)
 
-### Unit Tests
+Check if `useRegisterMutation.ts` needs to be updated to match the new schema type.
 
-Test each layer independently:
+**File**: `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/src/features/authentication/hooks/mutations/useRegisterMutation.ts`
 
-**Schema Tests:**
+**Current code uses**: `RegisterFormData` and `RegisterResponse`
+
+**Should use**: `RegisterRequest` from schemas
+
+**UPDATE to**:
+
 ```typescript
-// data/schemas/__tests__/auth.schema.test.ts
-import { describe, it, expect } from 'vitest'
-import { loginRequestSchema } from '../auth.schema'
+import { useMutation } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { authService } from '../../data/services'
+import type { RegisterRequest, AuthResponse } from '../../data/schemas'
 
-describe('loginRequestSchema', () => {
-  it('validates correct login data', () => {
-    const result = loginRequestSchema.safeParse({
-      email: 'user@example.com',
-      password: 'password123',
-    })
-    expect(result.success).toBe(true)
-  })
+// Module-level flag to prevent concurrent registrations
+let isRegistrationInProgress = false
 
-  it('rejects invalid email', () => {
-    const result = loginRequestSchema.safeParse({
-      email: 'invalid-email',
-      password: 'password123',
-    })
-    expect(result.success).toBe(false)
+export function useRegisterMutation() {
+  const router = useRouter()
+
+  return useMutation<AuthResponse, Error, RegisterRequest>({
+    mutationFn: async (data) => {
+      // Synchronous guard against concurrent mutations
+      if (isRegistrationInProgress) {
+        throw new Error('Registration already in progress')
+      }
+
+      try {
+        isRegistrationInProgress = true
+        return await authService.register(data)
+      } finally {
+        isRegistrationInProgress = false
+      }
+    },
+    onSuccess: () => {
+      toast.success('Account created!', {
+        description: 'Please check your email to verify your account.',
+        duration: 5000,
+      })
+    },
+    onError: (error) => {
+      // Don't show error for concurrent mutation attempts
+      if (error.message === 'Registration already in progress') {
+        return
+      }
+
+      toast.error('Registration failed', {
+        description: error.message || 'Unable to create account. Please try again.',
+      })
+    },
   })
-})
+}
 ```
 
-**Hook Tests:**
-```typescript
-// hooks/__tests__/useLoginMutation.test.ts
-import { describe, it, expect, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { useLoginMutation } from '../mutations/useLoginMutation'
-import { getQueryClient } from '@/lib/query-client'
+**Key Changes**:
+1. ✅ Use `RegisterRequest` type (includes confirmPassword)
+2. ✅ Use `AuthResponse` return type
+3. ✅ Keep concurrent registration guard
+4. ✅ Keep toast notifications
 
-describe('useLoginMutation', () => {
-  it('calls login service on mutation', async () => {
-    const queryClient = getQueryClient()
-    const wrapper = ({ children }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    )
+---
 
-    const { result } = renderHook(() => useLoginMutation(), { wrapper })
+## Critical Requirements Checklist
 
-    result.current.login({
-      email: 'test@example.com',
-      password: 'password',
-    })
+### AC1 Compliance ✅
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false))
-  })
-})
+- ✅ **confirmPassword field** in RegisterForm
+- ✅ **Password visibility toggle** (eye icon) via PasswordInput
+- ✅ **Live password requirements** indicator
+- ✅ **react-hook-form** with zodResolver (NOT server actions)
+- ✅ **Zod validation** with inline error messages via FormMessage
+- ✅ **Success toasts** after registration
+- ✅ **Error toasts** for failures
+- ✅ **Google OAuth button** with separator
+
+### Design Spec Compliance ✅
+
+- ✅ Follow shadcn/ui patterns (Form, FormField, FormItem, FormLabel, FormMessage)
+- ✅ Use colors from `app/globals.css`
+- ✅ Buttons show loading states (`isPending ? 'Creating...' : 'Create account'`)
+- ✅ Inputs disabled during submission
+- ✅ Error messages display inline below fields
+- ✅ Separator with "Or continue with" text
+
+### Code Quality ✅
+
+- ✅ TypeScript strict mode (no `any` types)
+- ✅ Proper React Query patterns (queries and mutations)
+- ✅ Service layer for API calls
+- ✅ Component composition and reusability
+- ✅ forwardRef for PasswordInput (react-hook-form integration)
+- ✅ Accessible with aria-labels and roles
+
+---
+
+## Testing Validation
+
+After implementation, run E2E tests to verify:
+
+```bash
+npm run test:e2e
 ```
 
-### Integration Tests
+**Expected results**:
+1. ✅ Registration with valid credentials
+2. ✅ Invalid email format validation
+3. ✅ Password too short validation
+4. ✅ Passwords do not match validation
+5. ✅ Duplicate registration handling
+6. ✅ Login with empty email
+7. ✅ Login with empty password
+8. ✅ Login with invalid credentials
+9. ✅ User-friendly error messages display
+10. ✅ Submit button disable during submission
+11. ✅ Keyboard navigation support
+12. ✅ Success toast after registration
 
-Test form submission flows:
+**Expected pass rate**: 100% (12/12 tests)
+
+---
+
+## Architecture Patterns
+
+### Form Pattern
 
 ```typescript
-// components/__tests__/LoginForm.test.tsx
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { LoginForm } from '../LoginForm'
+// 1. Define schema (already in data/schemas/auth.schema.ts)
+export const registerRequestSchema = z.object({
+  email: emailValidator,
+  password: passwordValidator,
+  confirmPassword: z.string().min(1),
+}).refine(...)
 
-describe('LoginForm', () => {
-  it('displays validation errors', async () => {
-    render(<LoginForm />)
+// 2. Create mutation hook (in hooks/mutations/)
+export function useRegisterMutation() {
+  return useMutation({
+    mutationFn: (data: RegisterRequest) => authService.register(data),
+    onSuccess: () => toast.success(...),
+    onError: (error) => toast.error(...),
+  })
+}
 
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-    fireEvent.click(submitButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/invalid email/i)).toBeInTheDocument()
-    })
+// 3. Build form component (in components/)
+export function RegisterForm() {
+  const form = useForm<RegisterRequest>({
+    resolver: zodResolver(registerRequestSchema),
+    defaultValues: {...},
   })
 
-  it('submits form with valid data', async () => {
-    render(<LoginForm />)
+  const { mutate, isPending } = useRegisterMutation()
 
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'test@example.com' },
-    })
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: 'password123' },
-    })
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField ... />
+      </form>
+    </Form>
+  )
+}
+```
 
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+### Live Validation Pattern
 
-    await waitFor(() => {
-      expect(screen.getByText(/signing in/i)).toBeInTheDocument()
-    })
-  })
-})
+```typescript
+// Watch field value
+const password = form.watch('password')
+
+// Show live indicator
+{password && <PasswordRequirements password={password} />}
+```
+
+### Error Handling Pattern
+
+```typescript
+// Inline errors (field-level)
+<FormMessage /> // Automatically shows field errors
+
+// Global errors (toast)
+onError: (error) => toast.error('Title', { description: error.message })
 ```
 
 ---
 
 ## Important Notes
 
-### 1. React Query Devtools
+### Colors
 
-**Enable in development:**
-- Devtools are conditionally rendered in `Providers`
-- Access via floating icon in bottom-left
-- Inspect queries, mutations, cache state
-- Debug stale/fresh data issues
+Use colors from `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/app/globals.css`:
 
-### 2. Cache Invalidation
+- Text: `text-foreground`, `text-muted-foreground`
+- Background: `bg-background`, `bg-muted`
+- Buttons: `bg-primary`, `bg-secondary`
+- Success: `text-green-600` (for met requirements)
+- Error: `text-destructive`
+- Border: `border-border`
 
-**When to invalidate:**
-- After login: Invalidate `session` and `user`
-- After logout: Clear entire cache
-- After profile update: Update `user` cache
-- On auth state change: Invalidate relevant queries
+### Form Validation Timing
 
-**How to invalidate:**
-```typescript
-queryClient.invalidateQueries({ queryKey: queryKeys.auth.session() })
-queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
-queryClient.clear() // Clear everything
-```
+- **Client-side**: Zod schema + react-hook-form (instant feedback)
+- **Trigger**: `mode: 'onBlur'` (validate when field loses focus)
+- **Display**: Inline errors below fields + global errors as toasts
+- **Server-side**: Backend validation (security, already implemented)
 
-### 3. Query Key Consistency
+### Password Requirements Display
 
-**Always use query key factory:**
-```typescript
-// ❌ BAD
-useQuery({ queryKey: ['auth', 'session'] })
+Show live as user types:
+- ✅ Green text + Check icon when met
+- ❌ Gray text + X icon when not met
+- Only show when `password.length > 0`
+- Must match Zod `passwordValidator` rules
 
-// ✅ GOOD
-useQuery({ queryKey: queryKeys.auth.session() })
-```
+### Dependencies Already Installed ✅
 
-This ensures cache invalidation works correctly.
+From validation report:
+- ✅ react-hook-form
+- ✅ @hookform/resolvers
+- ✅ zod
+- ✅ @tanstack/react-query
+- ✅ @supabase/ssr
+- ✅ shadcn/ui (form, input, button, label, separator)
+- ✅ sonner (toasts)
+- ✅ lucide-react (icons: Eye, EyeOff, Check, X)
 
-### 4. Form Validation
-
-**Two-level validation:**
-1. **Client-side**: Zod schema via `zodResolver`
-2. **Server-side**: API endpoint validation
-
-Always display both validation errors and API errors.
-
-### 5. Loading States
-
-**Handle loading states properly:**
-```typescript
-const { data, isLoading, isFetching } = useQuery(...)
-
-// Initial load
-if (isLoading) return <Skeleton />
-
-// Background refetch
-if (isFetching) return <Spinner position="top-right" />
-
-// Success
-return <Content data={data} />
-```
-
-### 6. Error Boundaries
-
-Consider adding error boundaries for auth components:
-```typescript
-// components/AuthErrorBoundary.tsx
-export class AuthErrorBoundary extends Component {
-  // Handle auth errors gracefully
-}
-```
-
-### 7. Optimistic Updates
-
-For profile updates, use optimistic updates:
-```typescript
-useMutation({
-  mutationFn: updateProfile,
-  onMutate: async (newProfile) => {
-    // Cancel outgoing queries
-    await queryClient.cancelQueries({ queryKey: queryKeys.auth.user() })
-
-    // Snapshot previous value
-    const previousProfile = queryClient.getQueryData(queryKeys.auth.user())
-
-    // Optimistically update
-    queryClient.setQueryData(queryKeys.auth.user(), newProfile)
-
-    return { previousProfile }
-  },
-  onError: (err, newProfile, context) => {
-    // Rollback on error
-    queryClient.setQueryData(queryKeys.auth.user(), context.previousProfile)
-  },
-  onSettled: () => {
-    // Refetch after success or error
-    queryClient.invalidateQueries({ queryKey: queryKeys.auth.user() })
-  },
-})
-```
-
-### 8. Supabase RLS Policies
-
-**IMPORTANT**: Backend must create these RLS policies:
-
-```sql
--- Profiles table policies
-CREATE POLICY "Users can view own profile"
-  ON profiles FOR SELECT
-  USING (auth.uid() = id);
-
-CREATE POLICY "Users can update own profile"
-  ON profiles FOR UPDATE
-  USING (auth.uid() = id);
-
-CREATE POLICY "Users can insert own profile"
-  ON profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
-```
-
-Without these, API calls will fail even with valid auth.
-
-### 9. Environment Variables
-
-**Required in `.env.local`:**
-```env
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-### 10. Color Usage
-
-**Use colors defined in `/Users/danielmachado/Documents/Developer/Personal/financial-advisor/app/globals.css`:**
-
-Current colors:
-- `--background`: Background color
-- `--foreground`: Text color
-
-For auth components, use Tailwind classes that reference these CSS variables:
-```tsx
-className="bg-background text-foreground"
-```
-
-Additional colors should be added to `globals.css` following the same pattern.
+**No new dependencies needed!**
 
 ---
 
-## Next Steps for Backend Team
+## Files Summary
 
-Before frontend implementation can proceed, backend needs to:
+### Files to Create (6 files)
 
-1. **Create API Routes** (if not using Supabase directly):
-   - Implement endpoints listed in session context
-   - Handle Supabase Auth integration server-side
-   - Set up proper error responses
+1. `src/features/authentication/hooks/queries/useUserQuery.ts`
+2. `src/features/authentication/hooks/mutations/usePasswordResetMutation.ts`
+3. `src/features/authentication/hooks/mutations/useUpdatePasswordMutation.ts`
+4. `src/features/authentication/components/PasswordInput.tsx`
+5. `src/features/authentication/components/PasswordRequirements.tsx`
+6. `src/features/authentication/components/GoogleAuthButton.tsx`
 
-2. **Database Setup**:
-   - Create `profiles` table migration
-   - Set up RLS policies
-   - Create trigger for profile creation on user signup
+### Files to Modify (6 files)
 
-3. **Supabase Configuration**:
-   - Enable email auth
-   - Configure OAuth providers (Google)
-   - Customize email templates
-   - Set up redirect URLs
-
-4. **Test Accounts**:
-   - Create test users for development
-   - Document test credentials
+1. `src/features/authentication/hooks/queries/index.ts` (add 1 export)
+2. `src/features/authentication/hooks/mutations/index.ts` (add 2 exports)
+3. `src/features/authentication/hooks/mutations/useRegisterMutation.ts` (update types)
+4. `src/features/authentication/components/RegisterForm.tsx` (complete refactor)
+5. `src/features/authentication/components/LoginForm.tsx` (complete refactor)
+6. `src/features/authentication/components/index.ts` (add 3 exports)
 
 ---
 
-## Summary
+## Estimated Timeline
 
-This implementation plan provides:
+- **Phase 1** (Create Hooks): 30 minutes
+- **Phase 2** (Create Components): 1 hour
+- **Phase 3** (Refactor Forms): 1 hour
+- **Phase 4** (Update Mutation): 15 minutes
+- **Testing**: 30 minutes
 
-1. **Complete React Query setup** with optimized configuration
-2. **Supabase client setup** for browser, server, and middleware
-3. **Feature-based architecture** with clear separation of concerns
-4. **Type-safe schemas** with Zod for validation
-5. **Reusable hooks** for queries and mutations
-6. **Auth context** for global state management
-7. **Protected route pattern** for authentication
-8. **Form management** with react-hook-form
-9. **OAuth flow** for Google authentication
-10. **Profile completion** for new users
-11. **Error handling** strategy
-12. **Testing patterns** for all layers
-
-**Key Principles:**
-- Server state in React Query
-- Validation with Zod schemas
-- Business logic in hooks
-- Presentation in components
-- Type safety everywhere
-
-**Ready for Implementation:**
-All patterns are documented with complete code examples. Frontend team can start implementing immediately after backend sets up Supabase and database.
+**Total**: 3 hours 15 minutes
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: October 30, 2025
-**Status**: Ready for Implementation
+## Success Criteria
+
+### Before Merging
+
+- [ ] All 6 new files created
+- [ ] All 6 modified files updated
+- [ ] RegisterForm has confirmPassword field
+- [ ] LoginForm has password toggle
+- [ ] E2E tests pass at 100% (12/12)
+- [ ] No TypeScript errors: `npm run type-check`
+- [ ] No ESLint warnings: `npm run lint`
+- [ ] Forms work on mobile (responsive)
+- [ ] Password toggle works correctly
+- [ ] Live password requirements update correctly
+- [ ] Success and error toasts display correctly
+
+### User Experience
+
+- [ ] Registration form feels smooth and intuitive
+- [ ] Password requirements guide user to create strong password
+- [ ] Error messages are helpful and specific
+- [ ] Loading states are clear
+- [ ] Forms don't flicker or jump during validation
+- [ ] Tab navigation works correctly
+- [ ] Enter key submits form
+- [ ] Google OAuth redirects correctly
+
+---
+
+## Next Steps After Implementation
+
+1. **Type check**: `npm run type-check`
+2. **Run E2E tests**: `npm run test:e2e`
+3. **Manual testing**:
+   - Register flow with confirmPassword
+   - Password toggle works
+   - Live requirements update
+   - Login flow
+   - Google OAuth
+4. **Responsive testing**: Mobile, tablet, desktop
+5. **Accessibility audit**: `npm run lighthouse` or browser DevTools
+6. **Create summary**: `.claude/doc/authentication/frontend_implementation_complete.md`
+
+---
+
+## Known Issues to Watch For
+
+### Schema Type Mismatches
+
+**Issue**: useRegisterMutation might use `RegisterFormData` instead of `RegisterRequest`
+
+**Fix**: Update mutation hook to use `RegisterRequest` from schemas (includes confirmPassword)
+
+### PasswordRequirements Sync
+
+**Issue**: Requirements in component must match Zod schema rules
+
+**Fix**: Keep both in sync. Consider extracting to shared constants if they diverge.
+
+### Toast Duplication
+
+**Issue**: Both mutation hook and form component might show toasts
+
+**Fix**: Let mutation hook handle toasts, don't duplicate in form
+
+---
+
+**Status**: ✅ Ready for implementation
+**Blockers**: None - all dependencies installed, architecture defined
+**Risk**: Low - clear specifications, existing schemas correct, patterns established

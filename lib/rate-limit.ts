@@ -144,8 +144,8 @@ export async function rateLimit(
 }> {
   // Default configuration
   const rateLimitConfig: RateLimitConfig = {
-    limit: parseInt(process.env.RATE_LIMIT_REQUESTS || '60', 10),
-    window: parseInt(process.env.RATE_LIMIT_WINDOW || '60', 10) * 1000, // Convert to ms
+    limit: parseInt(process.env.RATE_LIMIT_REQUESTS || '200', 10),
+    window: parseInt(process.env.RATE_LIMIT_WINDOW || '200', 10) * 1000, // Convert to ms
     ...config,
   }
 

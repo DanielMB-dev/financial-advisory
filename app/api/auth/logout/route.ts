@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { LogoutUseCase } from '@/src/features/authentication/application/use-cases/LogoutUseCase'
-import { SupabaseSessionAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseSessionAdapter'
+import { SupabaseRouteHandlerSessionAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseRouteHandlerSessionAdapter'
 
 export async function POST() {
   try {
-    const sessionManager = new SupabaseSessionAdapter()
+    const sessionManager = new SupabaseRouteHandlerSessionAdapter()
     const useCase = new LogoutUseCase(sessionManager)
     await useCase.execute()
 

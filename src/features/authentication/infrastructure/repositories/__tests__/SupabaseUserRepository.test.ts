@@ -4,9 +4,13 @@ import { UserId } from '../../../domain/value-objects/UserId'
 import { Email } from '../../../domain/value-objects/Email'
 import { UserProfile } from '../../../domain/entities/UserProfile'
 
-// Mock the Supabase client
+// Mock the Supabase clients
 vi.mock('../../supabase/server-client', () => ({
   createServerSupabaseClient: vi.fn(() => mockSupabaseClient),
+}))
+
+vi.mock('../../supabase/admin-client', () => ({
+  createAdminClient: vi.fn(() => mockSupabaseClient),
 }))
 
 const createMockChain = () => ({

@@ -14,6 +14,8 @@ import {
 
 export class SupabaseAuthAdapter implements IAuthenticationService {
   async registerWithEmail(email: Email, password: Password): Promise<User> {
+    // Use server client for standard user registration (Supabase best practice)
+    // This will trigger email verification automatically
     const supabase = await createServerSupabaseClient()
 
     const { data, error } = await supabase.auth.signUp({
@@ -24,8 +26,12 @@ export class SupabaseAuthAdapter implements IAuthenticationService {
       },
     })
 
+    // Handle duplicate email
     if (error) {
-      if (error.message.includes('already registered')) {
+      if (
+        error.message.includes('already registered') ||
+        error.message.includes('already been registered')
+      ) {
         throw new DuplicateEmailError()
       }
       throw new Error(error.message)
@@ -34,6 +40,9 @@ export class SupabaseAuthAdapter implements IAuthenticationService {
     if (!data.user) {
       throw new Error('User registration failed')
     }
+
+    // Note: Profile is automatically created by database trigger
+    // See: supabase/migrations/20251030_create_profiles_table.sql
 
     return User.reconstitute({
       id: data.user.id,

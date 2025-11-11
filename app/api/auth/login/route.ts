@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { LoginWithEmailUseCase } from '@/src/features/authentication/application/use-cases/LoginWithEmailUseCase'
 import { SupabaseAuthAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseAuthAdapter'
-import { SupabaseSessionAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseSessionAdapter'
+import { SupabaseRouteHandlerSessionAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseRouteHandlerSessionAdapter'
 import { SupabaseUserRepository } from '@/src/features/authentication/infrastructure/repositories/SupabaseUserRepository'
 import { z } from 'zod'
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const validatedData = loginSchema.parse(body)
 
     const authService = new SupabaseAuthAdapter()
-    const sessionManager = new SupabaseSessionAdapter()
+    const sessionManager = new SupabaseRouteHandlerSessionAdapter()
     const userRepository = new SupabaseUserRepository()
 
     const useCase = new LoginWithEmailUseCase(authService, sessionManager, userRepository)

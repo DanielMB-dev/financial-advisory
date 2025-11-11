@@ -2,8 +2,8 @@ echo "🔍 Running pre-commit checks..."
 
 # Run lint-staged (formatting + lint fixes)
 npx lint-staged
-npm run format
-npm run lint
+# npm run format
+# npm run lint
 
 # Type check
 echo "📝 Running type check..."

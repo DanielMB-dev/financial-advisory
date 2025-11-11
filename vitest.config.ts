@@ -8,6 +8,16 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    // Exclude e2e and ui-analysis tests (those are Playwright tests)
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/cypress/**',
+      '**/.{idea,git,cache,output,temp}/**',
+      '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
+      'tests/e2e/**',
+      'tests/ui-analysis/**',
+    ],
     env: {
       NODE_ENV: 'test',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000',

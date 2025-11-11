@@ -1,28 +1,63 @@
+import { createServerSupabaseClient } from '@/src/features/authentication/infrastructure/supabase/server-client'
 import { NextRequest, NextResponse } from 'next/server'
-import { LoginWithGoogleUseCase } from '@/src/features/authentication/application/use-cases/LoginWithGoogleUseCase'
-import { SupabaseAuthAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseAuthAdapter'
-import { SupabaseSessionAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseSessionAdapter'
-import { SupabaseUserRepository } from '@/src/features/authentication/infrastructure/repositories/SupabaseUserRepository'
 
+/**
+ * OAuth callback handler for Google and other OAuth providers
+ * This route handles the OAuth redirect and exchanges the code for a session
+ *
+ * Configured in Google Cloud Console as the redirect URI
+ */
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const code = searchParams.get('code')
+  const requestUrl = new URL(request.url)
+  const code = requestUrl.searchParams.get('code')
+  let next = requestUrl.searchParams.get('next') ?? '/dashboard'
 
-    if (!code) {
-      return NextResponse.redirect(new URL('/login?error=missing_code', request.url))
+  console.log('[OAuth Callback] Request URL:', requestUrl.href)
+  console.log('[OAuth Callback] Code received:', code ? 'YES' : 'NO')
+  console.log('[OAuth Callback] Next path:', next)
+
+  // Ensure next path starts with /
+  if (!next.startsWith('/')) {
+    next = '/'
+  }
+
+  if (code) {
+    const supabase = await createServerSupabaseClient()
+
+    console.log('[OAuth Callback] Exchanging code for session...')
+
+    // Exchange code for session (PKCE flow for OAuth)
+    // The code verifier is automatically retrieved from server-side cookies
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (error) {
+      console.error('[OAuth Callback] Exchange error:', error)
+      // Redirect to login with error
+      return NextResponse.redirect(
+        new URL(
+          '/login?error=oauth_failed&message=' + encodeURIComponent(error.message),
+          requestUrl.origin
+        )
+      )
     }
 
-    const authService = new SupabaseAuthAdapter()
-    const sessionManager = new SupabaseSessionAdapter()
-    const userRepository = new SupabaseUserRepository()
+    console.log('[OAuth Callback] Session established successfully')
 
-    const useCase = new LoginWithGoogleUseCase(authService, sessionManager, userRepository)
-    await useCase.handleCallback(code)
+    // Successful OAuth authentication - redirect to destination
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const isLocalEnv = process.env.NODE_ENV === 'development'
 
-    // Redirect to dashboard after successful OAuth
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  } catch (_error) {
-    return NextResponse.redirect(new URL('/login?error=oauth_failed', request.url))
+    const redirectUrl = isLocalEnv
+      ? `${requestUrl.origin}${next}`
+      : forwardedHost
+        ? `https://${forwardedHost}${next}`
+        : `${requestUrl.origin}${next}`
+
+    console.log('[OAuth Callback] Redirecting to:', redirectUrl)
+    return NextResponse.redirect(redirectUrl)
   }
+
+  // No code provided - redirect to login
+  console.log('[OAuth Callback] No code provided, redirecting to login')
+  return NextResponse.redirect(new URL('/login?error=no_code', requestUrl.origin))
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { GetCurrentUserUseCase } from '@/src/features/authentication/application/use-cases/GetCurrentUserUseCase'
-import { SupabaseSessionAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseSessionAdapter'
+import { SupabaseRouteHandlerSessionAdapter } from '@/src/features/authentication/infrastructure/adapters/SupabaseRouteHandlerSessionAdapter'
 import { SupabaseUserRepository } from '@/src/features/authentication/infrastructure/repositories/SupabaseUserRepository'
 
 export async function GET() {
   try {
-    const sessionManager = new SupabaseSessionAdapter()
+    const sessionManager = new SupabaseRouteHandlerSessionAdapter()
     const userRepository = new SupabaseUserRepository()
 
     const useCase = new GetCurrentUserUseCase(sessionManager, userRepository)
