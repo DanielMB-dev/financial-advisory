@@ -139,6 +139,7 @@ export const authService = {
 
   /**
    * Login with Google OAuth
+   * Forces consent screen to show on every login
    */
   async loginWithGoogle(): Promise<void> {
     const supabase = getSupabaseClient()
@@ -146,6 +147,10 @@ export const authService = {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
 
