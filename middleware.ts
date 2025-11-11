@@ -1,14 +1,15 @@
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
  * Middleware - Runs on every request
  *
  * Use for:
+ * - Supabase session management (refresh tokens)
  * - Rate limiting on sensitive routes
  * - Authentication checks
  * - Security headers
  * - Request logging
- * - A/B testing
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -21,6 +22,65 @@ export async function middleware(request: NextRequest) {
   ) {
     return NextResponse.next()
   }
+
+  // Create response - we'll use this to set cookies
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  // Supabase session management
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          // Set cookie in both request and response
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: CookieOptions) {
+          // Remove cookie from both request and response
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
+    }
+  )
+
+  // Refresh session if it exists - this is important for keeping the user logged in
+  await supabase.auth.getUser()
 
   // Apply rate limiting to API routes
   if (pathname.startsWith('/api/')) {
@@ -56,9 +116,8 @@ export async function middleware(request: NextRequest) {
   if (process.env.NODE_ENV === 'development') {
     console.log(`[${new Date().toISOString()}] ${request.method} ${pathname}`)
   }
-  console.log('trigger')
 
-  return NextResponse.next()
+  return response
 }
 
 /**

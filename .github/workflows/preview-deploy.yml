@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, develop]
     types: [opened, synchronize, reopened]
-    
+
 permissions:
   contents: read
   issues: write
@@ -29,7 +29,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --include=optional
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
