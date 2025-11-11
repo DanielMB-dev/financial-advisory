@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/client'
 import type { UserProfile, UpdateProfileRequest } from '../schemas'
 
-const supabase = createClient()
+/**
+ * Get Supabase client instance
+ * Creates client lazily to avoid initialization during build time
+ */
+const getSupabaseClient = () => createClient()
 
 /**
  * User Service
@@ -12,6 +16,7 @@ export const userService = {
    * Get current user profile
    */
   async getProfile(): Promise<UserProfile | null> {
+    const supabase = getSupabaseClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -44,6 +49,7 @@ export const userService = {
    * Update user profile
    */
   async updateProfile(data: UpdateProfileRequest): Promise<UserProfile> {
+    const supabase = getSupabaseClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -81,6 +87,7 @@ export const userService = {
    * Create user profile (for new users)
    */
   async createProfile(userId: string, email: string, fullName?: string): Promise<UserProfile> {
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('profiles')
       .insert({

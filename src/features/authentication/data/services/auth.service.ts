@@ -7,7 +7,11 @@ import type {
   UpdatePasswordRequest,
 } from '../schemas'
 
-const supabase = createClient()
+/**
+ * Get Supabase client instance
+ * Creates client lazily to avoid initialization during build time
+ */
+const getSupabaseClient = () => createClient()
 
 /**
  * Auth Response type matching Supabase structure
@@ -26,6 +30,7 @@ export const authService = {
    * Login with email and password
    */
   async login(data: LoginRequest): Promise<AuthResponse> {
+    const supabase = getSupabaseClient()
     const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
@@ -45,6 +50,7 @@ export const authService = {
    * Register new user
    */
   async register(data: RegisterRequest): Promise<AuthResponse> {
+    const supabase = getSupabaseClient()
     const { data: authData, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
@@ -67,6 +73,7 @@ export const authService = {
    * Logout current user
    */
   async logout(): Promise<void> {
+    const supabase = getSupabaseClient()
     const { error } = await supabase.auth.signOut()
 
     if (error) {
@@ -78,6 +85,7 @@ export const authService = {
    * Request password reset email
    */
   async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
+    const supabase = getSupabaseClient()
     const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
       redirectTo: `${window.location.origin}/reset-password`,
     })
@@ -91,6 +99,7 @@ export const authService = {
    * Update password with reset token
    */
   async updatePassword(data: UpdatePasswordRequest): Promise<void> {
+    const supabase = getSupabaseClient()
     const { error } = await supabase.auth.updateUser({
       password: data.password,
     })
@@ -104,6 +113,7 @@ export const authService = {
    * Get current session
    */
   async getSession(): Promise<SupabaseSession | null> {
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase.auth.getSession()
 
     if (error) {
@@ -117,6 +127,7 @@ export const authService = {
    * Refresh session
    */
   async refreshSession(): Promise<SupabaseSession | null> {
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase.auth.refreshSession()
 
     if (error) {
@@ -130,6 +141,7 @@ export const authService = {
    * Login with Google OAuth
    */
   async loginWithGoogle(): Promise<void> {
+    const supabase = getSupabaseClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
