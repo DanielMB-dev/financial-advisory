@@ -84,8 +84,47 @@ export async function middleware(request: NextRequest) {
 
   // Apply rate limiting to API routes
   if (pathname.startsWith('/api/')) {
-    // More aggressive rate limiting for auth endpoints
-    if (pathname.startsWith('/api/auth/')) {
+    // CRITICAL: Password reset endpoint - strictest rate limiting (10/hour per IP)
+    if (pathname === '/api/auth/reset-password') {
+      const { rateLimit } = await import('./lib/rate-limit')
+      const rateLimitResult = await rateLimit(request, {
+        limit: 10, // 10 requests
+        window: 3600000, // per hour (3600000ms)
+      })
+
+      if (!rateLimitResult.success) {
+        const retryAfter = Math.ceil((rateLimitResult.reset - Date.now()) / 1000)
+        return NextResponse.json(
+          {
+            error: 'Too many password reset requests from this IP address. Please try again later.',
+            retryAfter,
+          },
+          {
+            status: 429,
+            headers: {
+              'Retry-After': retryAfter.toString(),
+              'X-RateLimit-Limit': '10',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': rateLimitResult.reset.toString(),
+            },
+          }
+        )
+      }
+    }
+    // Stricter rate limiting for password update endpoint (10/hour per IP)
+    else if (pathname === '/api/auth/update-password') {
+      const { rateLimit } = await import('./lib/rate-limit')
+      const rateLimitResult = await rateLimit(request, {
+        limit: 10, // 10 requests
+        window: 3600000, // per hour
+      })
+
+      if (!rateLimitResult.success) {
+        return rateLimitResult.response
+      }
+    }
+    // More aggressive rate limiting for other auth endpoints
+    else if (pathname.startsWith('/api/auth/')) {
       const { rateLimit } = await import('./lib/rate-limit')
       const rateLimitResult = await rateLimit(request, {
         limit: 5, // 5 requests
