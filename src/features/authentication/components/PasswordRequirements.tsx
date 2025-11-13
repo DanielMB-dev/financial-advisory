@@ -37,21 +37,24 @@ interface PasswordRequirementsProps {
  */
 export function PasswordRequirements({ password }: PasswordRequirementsProps) {
   return (
-    <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+    <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3 sm:p-4">
       <p className="text-sm font-medium text-foreground">Password requirements:</p>
-      <ul className="space-y-1.5">
+      <ul className="space-y-2 sm:space-y-1.5">
         {requirements.map((requirement, index) => {
           const isMet = requirement.test(password)
           return (
             <li
               key={index}
               className={cn(
-                'flex items-center gap-2 text-sm transition-colors',
-                isMet ? 'text-foreground' : 'text-muted-foreground'
+                'flex items-center gap-2.5 text-sm transition-colors',
+                isMet ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'
               )}
             >
               {isMet ? (
-                <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <Check
+                  className="h-4 w-4 shrink-0 text-green-600 dark:text-green-500"
+                  aria-hidden="true"
+                />
               ) : (
                 <X className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               )}

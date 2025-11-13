@@ -1,0 +1,58 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+    - generic [ref=e3]:
+        - generic [ref=e4]:
+            - generic [ref=e5]: Reset your password
+            - generic [ref=e6]: Enter your new password below
+        - generic [ref=e8]:
+            - generic [ref=e9]:
+                - heading "Create new password" [level=2] [ref=e10]
+                - paragraph [ref=e11]: Enter a strong password to protect your account
+            - generic [ref=e12]:
+                - generic [ref=e13]:
+                    - generic [ref=e14]: New Password
+                    - generic [ref=e15]:
+                        - textbox "New Password" [ref=e16]:
+                            - /placeholder: ••••••••
+                            - text: Pass1
+                        - button "Show password" [ref=e17]:
+                            - img
+                    - generic [ref=e18]:
+                        - paragraph [ref=e19]: 'Password requirements:'
+                        - list [ref=e20]:
+                            - listitem [ref=e21]:
+                                - img [ref=e22]
+                                - generic [ref=e25]: At least 8 characters
+                            - listitem [ref=e26]:
+                                - img [ref=e27]
+                                - generic [ref=e29]: One uppercase letter
+                            - listitem [ref=e30]:
+                                - img [ref=e31]
+                                - generic [ref=e33]: One lowercase letter
+                            - listitem [ref=e34]:
+                                - img [ref=e35]
+                                - generic [ref=e37]: One number
+                    - alert [ref=e38]: Password must be at least 8 characters
+                - generic [ref=e39]:
+                    - generic [ref=e40]: Confirm Password
+                    - generic [ref=e41]:
+                        - textbox "Confirm Password" [ref=e42]:
+                            - /placeholder: ••••••••
+                            - text: Pass1
+                        - button "Show password" [ref=e43]:
+                            - img
+                - button "Reset password" [ref=e44]
+            - paragraph [ref=e45]:
+                - link "Back to login" [ref=e46] [cursor=pointer]:
+                    - /url: /login
+    - region "Notifications alt+T"
+    - generic [ref=e47]:
+        - img [ref=e49]
+        - button "Open Tanstack query devtools" [ref=e97] [cursor=pointer]:
+            - img [ref=e98]
+    - button "Open Next.js Dev Tools" [ref=e151] [cursor=pointer]:
+        - img [ref=e152]
+    - alert [ref=e155]
+```
