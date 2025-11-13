@@ -1,13 +1,13 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
+import { Suspense, useEffect } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ResetPasswordForm } from '@/src/features/authentication/components/ResetPasswordForm'
-import { useEffect } from 'react'
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
@@ -82,5 +82,28 @@ export default function ResetPasswordPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="py-10">
+              <div className="text-center space-y-4">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+                <div className="space-y-2">
+                  <p className="font-medium text-foreground">Loading...</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
