@@ -63,9 +63,14 @@ describe('ResetPasswordForm', () => {
     fireEvent.change(passwordInput, { target: { value: 'short' } })
     fireEvent.blur(passwordInput)
 
+    // The PasswordRequirements component should show the unmet requirement
     await waitFor(() => {
-      expect(screen.getByText(/password must be at least 8 characters/i)).toBeInTheDocument()
+      expect(screen.getByText(/at least 8 characters/i)).toBeInTheDocument()
     })
+
+    // Verify the requirement is shown as unmet (with X icon, not check icon)
+    const requirementItem = screen.getByText(/at least 8 characters/i).closest('li')
+    expect(requirementItem).toHaveClass('text-muted-foreground')
   })
 
   it('should show validation error for password without uppercase', async () => {

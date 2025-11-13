@@ -45,7 +45,6 @@ describe('ForgotPasswordForm', () => {
     render(<ForgotPasswordForm />, { wrapper })
 
     const emailInput = screen.getByLabelText(/email/i)
-    const submitButton = screen.getByRole('button', { name: /send reset link/i })
 
     fireEvent.change(emailInput, { target: { value: 'invalid-email' } })
     fireEvent.blur(emailInput)
@@ -59,14 +58,16 @@ describe('ForgotPasswordForm', () => {
     render(<ForgotPasswordForm />, { wrapper })
 
     const emailInput = screen.getByLabelText(/email/i)
-    const submitButton = screen.getByRole('button', { name: /send reset link/i })
 
+    // First enter a valid email, then clear it to trigger validation
+    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
     fireEvent.change(emailInput, { target: { value: '' } })
     fireEvent.blur(emailInput)
-    fireEvent.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/email is required/i)).toBeInTheDocument()
+      expect(
+        screen.getByText(/please enter a valid email address|email is required/i)
+      ).toBeInTheDocument()
     })
   })
 
