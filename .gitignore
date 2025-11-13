@@ -44,3 +44,6 @@ next-env.d.ts
 .env.sentry-build-plugin
 
 .claude
+
+playwright-report/
+tests-results/
